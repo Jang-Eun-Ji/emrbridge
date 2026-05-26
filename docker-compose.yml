@@ -1,0 +1,43 @@
+services:
+  app-db:
+    image: postgres:16
+    container_name: emrbridge-app-db
+    environment:
+      POSTGRES_DB: emrbridge
+      POSTGRES_USER: emrbridge
+      POSTGRES_PASSWORD: emrbridge
+    ports:
+      - "5432:5432"
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+
+  fhir-db:
+    image: postgres:16
+    container_name: emrbridge-fhir-db
+    environment:
+      POSTGRES_DB: hapi
+      POSTGRES_USER: hapi
+      POSTGRES_PASSWORD: hapi
+    ports:
+      - "5433:5432"
+    volumes:
+      - fhir-db-data:/var/lib/postgresql/data
+
+  hapi-fhir:
+    image: hapiproject/hapi:latest
+    container_name: emrbridge-hapi-fhir
+    depends_on:
+      - fhir-db
+    ports:
+      - "8081:8080"
+    environment:
+      spring.datasource.url: jdbc:postgresql://fhir-db:5432/hapi
+      spring.datasource.username: hapi
+      spring.datasource.password: hapi
+      spring.datasource.driverClassName: org.postgresql.Driver
+      hapi.fhir.fhir_version: R4
+      hapi.fhir.allow_external_references: true
+
+volumes:
+  app-db-data:
+  fhir-db-data:
