@@ -11,6 +11,11 @@ spring:
     password: emrbridge
     driver-class-name: org.postgresql.Driver
 
+  flyway:
+    enabled: true
+    locations: classpath:db/migration  # 마이그레이션 SQL 파일 경로
+    baseline-on-migrate: true
+
   jpa:
     hibernate:
       ddl-auto: validate
@@ -20,12 +25,15 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
 
-  flyway:
-    enabled: true
-
   batch:
     job:
-      enabled: false
+      enabled: false              # ? ?? ? ?? ?? ??
+    jdbc:
+      initialize-schema: always   # Batch ?? ??? ?? ??
+
+csv:
+  import:
+    path: src/main/resources/csv  # Synthea CSV ??
 
 fhir:
   server:

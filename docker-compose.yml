@@ -1,7 +1,7 @@
 services:
-  app-db:
+  emr-db:
     image: postgres:16
-    container_name: emrbridge-app-db
+    container_name: emrbridge-emr-db
     environment:
       POSTGRES_DB: emrbridge
       POSTGRES_USER: emrbridge
@@ -9,7 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - app-db-data:/var/lib/postgresql/data
+      - emr-db-data:/var/lib/postgresql/data
 
   fhir-db:
     image: postgres:16
@@ -22,22 +22,30 @@ services:
       - "5433:5432"
     volumes:
       - fhir-db-data:/var/lib/postgresql/data
+    healthcheck: # 이게 없으면 HAPI가 DB 뜨기 전에 연결 시도
+      test: [ "CMD-SHELL", "pg_isready -U hapi" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   hapi-fhir:
-    image: hapiproject/hapi:latest
+    image: hapiproject/hapi:v8.2.0-1
     container_name: emrbridge-hapi-fhir
     depends_on:
-      - fhir-db
+      fhir-db:
+        condition: service_healthy   # DB 완전히 뜰 때까지 대기
     ports:
       - "8081:8080"
     environment:
-      spring.datasource.url: jdbc:postgresql://fhir-db:5432/hapi
-      spring.datasource.username: hapi
-      spring.datasource.password: hapi
-      spring.datasource.driverClassName: org.postgresql.Driver
-      hapi.fhir.fhir_version: R4
-      hapi.fhir.allow_external_references: true
+      SPRING_DATASOURCE_URL: jdbc:postgresql://fhir-db:5432/hapi
+      SPRING_DATASOURCE_USERNAME: hapi
+      SPRING_DATASOURCE_PASSWORD: hapi
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      HAPI_FHIR_FHIR_VERSION: R4
+      HAPI_FHIR_ALLOW_EXTERNAL_REFERENCES: "true"
+      HAPI_FHIR_REUSE_CACHED_SEARCH_RESULTS_MILLIS: "60000"
 
 volumes:
-  app-db-data:
+  emr-db-data:
   fhir-db-data:
