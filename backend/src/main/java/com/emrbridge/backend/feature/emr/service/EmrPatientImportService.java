@@ -25,6 +25,7 @@ public class EmrPatientImportService {
     @Value("${csv.import.path}")
     private String csvImportPath;
 
+    // read patients.csv and save to emr_patient table
     @Transactional
     public int importPatients() {
         String filePath = csvImportPath + "/patients.csv";
@@ -76,7 +77,7 @@ public class EmrPatientImportService {
             return savedCount;
 
         } catch (Exception e) {
-            throw new RuntimeException("patients.csv import 실패: " + e.getMessage(), e);
+            throw new RuntimeException("patients.csv import failed: " + e.getMessage(), e);
         }
     }
 
