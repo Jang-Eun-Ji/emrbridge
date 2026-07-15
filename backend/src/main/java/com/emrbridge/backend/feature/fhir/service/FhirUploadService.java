@@ -7,13 +7,10 @@ import com.emrbridge.backend.feature.emr.repository.*;
 import com.emrbridge.backend.feature.fhir.converter.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.hl7.fhir.r4.model.Organization;
-import org.hl7.fhir.r4.model.Patient;
-import org.hl7.fhir.r4.model.Practitioner;
+import org.hl7.fhir.r4.model.*;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import org.springframework.transaction.annotation.Transactional;
 @Slf4j
@@ -90,12 +87,23 @@ public class FhirUploadService {
         int count = 0;
         for (EmrEncounter emr : encounterRepo.findAll()) {
             try {
-                fhirClient.create().resource(encounterConverter.toFhir(emr)).execute();
+                MethodOutcome outcome = fhirClient.create()
+                        .resource(encounterConverter.toFhir(emr))
+                        .conditional()
+                        .where(Encounter.IDENTIFIER.exactly()
+                                .systemAndIdentifier(
+                                        "http://emrbridge.com/encounter-id",
+                                        emr.getSyntheaId()))
+                        .execute();
+
                 count++;
             } catch (Exception e) {
-                log.error("Encounter 전송 실패 - syntheaId: {}, error: {}", emr.getSyntheaId(), e.getMessage());
+                // Log and skip this encounter; do not interrupt the batch.
+                log.error("Encounter 전송 실패 - syntheaId: {}, error: {}",
+                        emr.getSyntheaId(), e.getMessage());
             }
         }
+
         log.info("Encounter FHIR 업로드 완료: {}건", count);
         return count;
     }

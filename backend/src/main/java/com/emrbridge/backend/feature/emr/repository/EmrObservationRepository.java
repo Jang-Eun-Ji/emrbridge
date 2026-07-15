@@ -6,6 +6,7 @@ import com.emrbridge.backend.feature.emr.domain.EmrPatient;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface EmrObservationRepository extends JpaRepository<EmrObservation, Long> {
@@ -13,4 +14,7 @@ public interface EmrObservationRepository extends JpaRepository<EmrObservation, 
             EmrPatient patient, EmrEncounter encounter, String code,
             LocalDateTime obsDate, String value);
 
+    List<EmrObservation> findAllByPatientAndEncounterAndCodeAndObsDateAndValue(
+            EmrPatient patient, EmrEncounter encounter, String code,
+            LocalDateTime obsDate, String value);
 }

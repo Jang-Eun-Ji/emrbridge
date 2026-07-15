@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface EmrProcedureRepository extends JpaRepository<EmrProcedure, Long> {
@@ -14,4 +15,7 @@ public interface EmrProcedureRepository extends JpaRepository<EmrProcedure, Long
             EmrPatient patient, EmrEncounter encounter, String code,
             LocalDateTime procDate, BigDecimal baseCost);
 
+    List<EmrProcedure> findAllByPatientAndEncounterAndCodeAndProcDateAndBaseCost(
+            EmrPatient patient, EmrEncounter encounter, String code,
+            LocalDateTime procDate, BigDecimal baseCost);
 }
