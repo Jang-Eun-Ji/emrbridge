@@ -273,10 +273,14 @@ public class SyntheaImportService {
 
     /**
      * Upserts conditions.csv into emr_condition.
-     * conditions.csv has no unique id column in the Synthea source, so the
-     * natural key used here is the composite (patient, encounter, code, startDate).
+     * Natural key: composite (patient, encounter, code, startDate). Uses
+     * findAllBy (list-result) rather than findBy (single-result) for
+     * consistency with the other line-item entities, since the Synthea source
+     * can in principle contain exact duplicate rows. If any row already
+     * matches on every key field, the CSV row is treated as an exact duplicate
+     * and is skipped entirely (no update, no insert).
      *
-     * @return number of rows processed (inserted or updated)
+     * @return number of rows processed (newly inserted; exact duplicates are skipped)
      */
     public int importConditions() {
         List<ConditionCsvRow> rows = parseCsv("conditions.csv", ConditionCsvRow.class);
@@ -288,19 +292,20 @@ public class SyntheaImportService {
             EmrEncounter encounter = encounterCache.get(r.getEncounter());
             LocalDate startDate = parseDate(r.getStart());
 
-            // Composite-key lookup: find an existing row that matches on
-            // patient + encounter + code + startDate, or start a new one.
-            EmrCondition condition = conditionRepo
-                    .findByPatientAndEncounterAndCodeAndStartDate(patient, encounter, r.getCode(), startDate)
-                    .orElse(EmrCondition.builder()
-                            .patient(patient)
-                            .encounter(encounter)
-                            .code(r.getCode())
-                            .startDate(startDate)
-                            .build());
+            // If a row already exists with the exact same key values, this CSV
+            // row is a duplicate of already-imported data - skip it entirely.
+            List<EmrCondition> matches = conditionRepo
+                    .findAllByPatientAndEncounterAndCodeAndStartDate(patient, encounter, r.getCode(), startDate);
+            if (!matches.isEmpty()) continue;
 
-            condition.setStopDate(parseDate(r.getStop()));
-            condition.setDescription(r.getDescription());
+            EmrCondition condition = EmrCondition.builder()
+                    .patient(patient)
+                    .encounter(encounter)
+                    .code(r.getCode())
+                    .startDate(startDate)
+                    .stopDate(parseDate(r.getStop()))
+                    .description(r.getDescription())
+                    .build();
 
             conditionRepo.save(condition);
             count++;
@@ -482,11 +487,12 @@ public class SyntheaImportService {
     }
     /**
      * Upserts allergies.csv into emr_allergy.
-     * Natural key: composite (patient, encounter, code) - allergies.csv has
-     * no per-row date granular enough to disambiguate multiple rows, so code
-     * within an encounter is used as the natural key.
+     * Natural key: composite (patient, encounter, code). Uses findAllBy for
+     * consistency with the other line-item entities. If any row already
+     * matches on every key field, the CSV row is treated as an exact duplicate
+     * and is skipped entirely (no update, no insert).
      *
-     * @return number of rows processed (inserted or updated)
+     * @return number of rows processed (newly inserted; exact duplicates are skipped)
      */
     public int importAllergies() {
         List<AllergyCsvRow> rows = parseCsv("allergies.csv", AllergyCsvRow.class);
@@ -497,31 +503,31 @@ public class SyntheaImportService {
 
             EmrEncounter encounter = encounterCache.get(r.getEncounter());
 
-            EmrAllergy allergy = allergyRepo
-                    .findByPatientAndEncounterAndCode(patient, encounter, r.getCode())
-                    .orElse(EmrAllergy.builder()
-                            .patient(patient)
-                            .encounter(encounter)
-                            .code(r.getCode())
-                            .build());
+            List<EmrAllergy> matches = allergyRepo
+                    .findAllByPatientAndEncounterAndCode(patient, encounter, r.getCode());
+            if (!matches.isEmpty()) continue;
 
-            allergy.setStartDate(parseDate(r.getStart()));
-            allergy.setStopDate(parseDate(r.getStop()));
-            allergy.setSystem(r.getSystem());
-            allergy.setDescription(r.getDescription());
-            allergy.setAllergyType(r.getType());
-            allergy.setCategory(r.getCategory());
-            allergy.setReaction1Code(r.getReaction1Code());
-            allergy.setReaction1Desc(r.getReaction1Desc());
-            allergy.setReaction2Code(r.getReaction2Code());
-            allergy.setReaction2Desc(r.getReaction2Desc());
+            EmrAllergy allergy = EmrAllergy.builder()
+                    .patient(patient)
+                    .encounter(encounter)
+                    .code(r.getCode())
+                    .startDate(parseDate(r.getStart()))
+                    .stopDate(parseDate(r.getStop()))
+                    .system(r.getSystem())
+                    .description(r.getDescription())
+                    .allergyType(r.getType())
+                    .category(r.getCategory())
+                    .reaction1Code(r.getReaction1Code())
+                    .reaction1Desc(r.getReaction1Desc())
+                    .reaction2Code(r.getReaction2Code())
+                    .reaction2Desc(r.getReaction2Desc())
+                    .build();
 
             allergyRepo.save(allergy);
             count++;
         }
         return count;
     }
-
 
 
     /**
