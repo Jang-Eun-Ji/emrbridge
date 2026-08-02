@@ -7,6 +7,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class PatientConverter {
 
+    // FHIR's officially recognized identifier system URI for US Social
+    // Security Numbers. Using the standard URI (instead of a custom one)
+    // means any FHIR-compliant consumer can recognize this identifier as
+    // an SSN without needing to know about emrbridge-specific conventions.
+    private static final String US_SSN_SYSTEM = "http://hl7.org/fhir/sid/us-ssn";
+
     public Patient toFhir(EmrPatient emr) {
         Patient patient = new Patient();
 
@@ -14,6 +20,18 @@ public class PatientConverter {
         patient.addIdentifier()
                 .setSystem("http://emrbridge.com/patient-id")
                 .setValue(emr.getSyntheaPatientId());
+
+        // SSN을 FHIR 표준 US-SSN identifier로 추가.
+        // This is the cross-EMR identifier: the same person seen at a
+        // different organization should carry the same SSN value here,
+        // allowing FHIR consumers (and conditional-create matching) to
+        // recognize them as the same individual even if their
+        // syntheaPatientId differs across sources.
+        if (emr.getSsn() != null && !emr.getSsn().isBlank()) {
+            patient.addIdentifier()
+                    .setSystem(US_SSN_SYSTEM)
+                    .setValue(emr.getSsn());
+        }
 
         // 이름
         patient.addName()

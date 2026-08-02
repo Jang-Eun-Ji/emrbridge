@@ -59,23 +59,46 @@ public class FhirUploadService {
         return result;
     }
 
+    /**
+     * Uploads all EmrPatient records to the FHIR server using conditional
+     * create, matched on SSN (http://hl7.org/fhir/sid/us-ssn) rather than the
+     * source-specific syntheaPatientId.
+     * <p>
+     * Matching on SSN means that if the same real-world person appears in
+     * multiple independent EMR sources (each assigning their own
+     * syntheaPatientId), the FHIR server recognizes them as a single existing
+     * Patient resource instead of creating a duplicate. Patients with no SSN
+     * on file are skipped, since conditional create requires a non-empty
+     * match value to avoid an unconstrained "create or match everything" query.
+     *
+     * @return number of patients successfully uploaded (created or matched)
+     */
     @Transactional(readOnly = true)
     public int uploadAllPatients() {
         int count = 0;
         for (EmrPatient emr : patientRepo.findAll()) {
+            // SSN is now the cross-EMR identity key; without one, conditional
+            // create has no reliable way to detect the same person arriving
+            // from a different source, so these are skipped rather than risking
+            // duplicate or unmatched Patient resources.
+            if (emr.getSsn() == null || emr.getSsn().isBlank()) {
+                log.warn("Patient skipped - no SSN on file, syntheaId: {}", emr.getSyntheaPatientId());
+                continue;
+            }
+
             try {
                 fhirClient.create()
                         .resource(patientConverter.toFhir(emr))
                         .conditional()
                         .where(Patient.IDENTIFIER.exactly()
                                 .systemAndIdentifier(
-                                        "http://emrbridge.com/patient-id",
-                                        emr.getSyntheaPatientId()))
+                                        "http://hl7.org/fhir/sid/us-ssn",
+                                        emr.getSsn()))
                         .execute();
                 count++;
             } catch (Exception e) {
-                log.error("Patient saving failed - syntheaId: {}, error: {}",
-                        emr.getSyntheaPatientId(), e.getMessage());
+                log.error("Patient saving failed - syntheaId: {}, ssn: {}, error: {}",
+                        emr.getSyntheaPatientId(), emr.getSsn(), e.getMessage());
             }
         }
         log.info("Patient FHIR 업로드: {}건", count);
