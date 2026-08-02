@@ -37,6 +37,7 @@ public class EmrEncounter {
     private LocalDateTime stopTime;
     private String encounterClass;
     private String code;
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
     @Column(precision = 10, scale = 2)
@@ -49,5 +50,6 @@ public class EmrEncounter {
     private BigDecimal payerCoverage;
 
     private String reasonCode;
+    @Column(name = "reason_description", columnDefinition = "TEXT")
     private String reasonDescription;
 }

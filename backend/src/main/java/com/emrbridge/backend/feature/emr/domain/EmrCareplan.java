@@ -30,7 +30,9 @@ public class EmrCareplan {
     private LocalDate startDate;
     private LocalDate stopDate;
     private String code;
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
     private String reasonCode;
+    @Column(name = "reason_description", columnDefinition = "TEXT")
     private String reasonDescription;
 }

@@ -29,8 +29,12 @@ public class EmrProcedure {
 
     private LocalDateTime procDate;
     private String code;
+
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
+
     @Column(precision = 10, scale = 2) private BigDecimal baseCost;
     private String reasonCode;
+    @Column(name = "reason_description", columnDefinition = "TEXT")
     private String reasonDescription;
 }

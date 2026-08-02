@@ -28,6 +28,7 @@ public class EmrAllergy {
     private LocalDate stopDate;
     private String code;
     private String system;
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
     private String allergyType;
     private String category;

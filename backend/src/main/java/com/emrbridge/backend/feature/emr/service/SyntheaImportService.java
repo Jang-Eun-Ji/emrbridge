@@ -17,11 +17,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
+
+import jakarta.persistence.EntityManager;
+
 
 /**
  * Imports Synthea-generated CSV files into the EMR database.
@@ -49,6 +49,7 @@ public class SyntheaImportService {
     private final EmrAllergyRepository allergyRepo;
     private final EmrImmunizationRepository immunizationRepo;
     private final EmrCareplanRepository careplanRepo;
+    private final EntityManager entityManager;
 
     @Value("${csv.import.path}")
     private String csvImportPath;
@@ -197,7 +198,7 @@ public class SyntheaImportService {
 
                 EmrPatient patient = patientCache.getOrDefault(
                         row.getId(), EmrPatient.builder().syntheaPatientId(row.getId()).build());
-
+                patient.setSsn(row.getSsn());
                 patient.setFirstName(row.getFirst());
                 patient.setLastName(row.getLast());
                 patient.setGender(row.getGender());
@@ -273,18 +274,25 @@ public class SyntheaImportService {
 
     /**
      * Upserts conditions.csv into emr_condition.
-     * Natural key: composite (patient, encounter, code, startDate). Uses
-     * findAllBy (list-result) rather than findBy (single-result) for
-     * consistency with the other line-item entities, since the Synthea source
-     * can in principle contain exact duplicate rows. If any row already
-     * matches on every key field, the CSV row is treated as an exact duplicate
-     * and is skipped entirely (no update, no insert).
+     * Natural key: composite (patient, encounter, code, startDate).
+     * See {@link #importObservations()} for the in-memory duplicate-check and
+     * batched-flush performance rationale.
      *
-     * @return number of rows processed (newly inserted; exact duplicates are skipped)
+     * @return number of rows newly inserted (exact duplicates are skipped)
      */
     public int importConditions() {
         List<ConditionCsvRow> rows = parseCsv("conditions.csv", ConditionCsvRow.class);
+
+        Set<String> existingKeys = conditionRepo.findAll().stream()
+                .map(c -> buildConditionKey(
+                        c.getPatient() != null ? c.getPatient().getId() : null,
+                        c.getEncounter() != null ? c.getEncounter().getId() : null,
+                        c.getCode(), c.getStartDate()))
+                .collect(Collectors.toCollection(HashSet::new));
+
         int count = 0;
+        int pendingSinceFlush = 0;
+
         for (ConditionCsvRow r : rows) {
             EmrPatient patient = patientCache.get(r.getPatient());
             if (patient == null) continue;
@@ -292,11 +300,12 @@ public class SyntheaImportService {
             EmrEncounter encounter = encounterCache.get(r.getEncounter());
             LocalDate startDate = parseDate(r.getStart());
 
-            // If a row already exists with the exact same key values, this CSV
-            // row is a duplicate of already-imported data - skip it entirely.
-            List<EmrCondition> matches = conditionRepo
-                    .findAllByPatientAndEncounterAndCodeAndStartDate(patient, encounter, r.getCode(), startDate);
-            if (!matches.isEmpty()) continue;
+            String key = buildConditionKey(patient.getId(),
+                    encounter != null ? encounter.getId() : null,
+                    r.getCode(), startDate);
+
+            if (existingKeys.contains(key)) continue;
+            existingKeys.add(key);
 
             EmrCondition condition = EmrCondition.builder()
                     .patient(patient)
@@ -309,26 +318,64 @@ public class SyntheaImportService {
 
             conditionRepo.save(condition);
             count++;
+            pendingSinceFlush++;
+
+            if (pendingSinceFlush >= 1000) {
+                entityManager.flush();
+                pendingSinceFlush = 0;
+            }
         }
+
+        if (pendingSinceFlush > 0) {
+            entityManager.flush();
+        }
+
         return count;
+    }
+
+    /**
+     * Builds a composite string key for in-memory duplicate detection of
+     * condition rows. Null-safe: encounter may be null.
+     */
+    private String buildConditionKey(Long patientId, Long encounterId, String code, LocalDate startDate) {
+        return patientId + "|" + encounterId + "|" + code + "|" + startDate;
     }
 
     /**
      * Upserts observations.csv into emr_observation.
      * Natural key: composite (patient, encounter, code, obsDate, value).
      * <p>
-     * Uses findAllBy instead of findBy because the Synthea source can contain
-     * multiple rows with identical values across every key field (verified in
-     * production data - findBy previously threw NonUniqueResultException here).
-     * If any row already matches on every key field, the CSV row is treated as
-     * an exact duplicate and is skipped entirely (no update, no insert). Only
-     * rows with no existing match are inserted as new.
+     * Performance: instead of issuing one SELECT per CSV row to check for an
+     * existing exact-duplicate match (previously turned a multi-million-row
+     * CSV into a multi-million-round-trip operation), this loads all existing
+     * (patient, encounter, code, obsDate, value) keys into an in-memory Set
+     * once at the start of the method. Each CSV row is then checked against
+     * that Set (O(1), no DB round trip). Rows are also batched and flushed
+     * every 1000 records (paired with hibernate.jdbc.batch_size=1000 in
+     * application.yml) so Hibernate can group them into batched INSERT
+     * statements instead of one round trip per row. The persistence context
+     * is intentionally NOT cleared between flushes, since patientCache/
+     * encounterCache hold managed entity references that FK relationships
+     * depend on; this trades higher memory usage for avoiding detached-entity
+     * errors on very large imports.
      *
-     * @return number of rows processed (newly inserted; exact duplicates are skipped)
+     * @return number of rows newly inserted (exact duplicates are skipped)
      */
     public int importObservations() {
         List<ObservationCsvRow> rows = parseCsv("observations.csv", ObservationCsvRow.class);
+
+        // Load all existing observation keys into memory once, instead of
+        // querying per row. Uses a composite string key for fast Set lookups.
+        Set<String> existingKeys = observationRepo.findAll().stream()
+                .map(o -> buildObservationKey(
+                        o.getPatient() != null ? o.getPatient().getId() : null,
+                        o.getEncounter() != null ? o.getEncounter().getId() : null,
+                        o.getCode(), o.getObsDate(), o.getValue()))
+                .collect(Collectors.toCollection(HashSet::new));
+
         int count = 0;
+        int pendingSinceFlush = 0;
+
         for (ObservationCsvRow r : rows) {
             EmrPatient patient = patientCache.get(r.getPatient());
             if (patient == null) continue;
@@ -336,12 +383,13 @@ public class SyntheaImportService {
             EmrEncounter encounter = encounterCache.get(r.getEncounter());
             LocalDateTime obsDate = parseDateTime(r.getDate());
 
-            // If a row already exists with the exact same key values, this CSV
-            // row is a duplicate of already-imported data - skip it entirely.
-            List<EmrObservation> matches = observationRepo
-                    .findAllByPatientAndEncounterAndCodeAndObsDateAndValue(
-                            patient, encounter, r.getCode(), obsDate, r.getValue());
-            if (!matches.isEmpty()) continue;
+            String key = buildObservationKey(patient.getId(),
+                    encounter != null ? encounter.getId() : null,
+                    r.getCode(), obsDate, r.getValue());
+
+            // In-memory duplicate check - no DB round trip.
+            if (existingKeys.contains(key)) continue;
+            existingKeys.add(key); // guard against duplicates within this same CSV file
 
             EmrObservation observation = EmrObservation.builder()
                     .patient(patient)
@@ -357,21 +405,55 @@ public class SyntheaImportService {
 
             observationRepo.save(observation);
             count++;
+            pendingSinceFlush++;
+
+            // Flush periodically so Hibernate groups pending inserts into
+            // batched statements (see hibernate.jdbc.batch_size). The
+            // persistence context is deliberately not cleared - see javadoc.
+            if (pendingSinceFlush >= 1000) {
+                entityManager.flush();
+                pendingSinceFlush = 0;
+            }
         }
+
+        // Flush any remaining rows that didn't reach a full batch.
+        if (pendingSinceFlush > 0) {
+            entityManager.flush();
+        }
+
         return count;
+    }
+
+    /**
+     * Builds a composite string key for in-memory duplicate detection of
+     * observation rows. Null-safe: encounter may legitimately be null.
+     */
+    private String buildObservationKey(Long patientId, Long encounterId, String code,
+                                       LocalDateTime obsDate, String value) {
+        return patientId + "|" + encounterId + "|" + code + "|" + obsDate + "|" + value;
     }
 
     /**
      * Upserts medications.csv into emr_medication.
      * Natural key: composite (patient, encounter, code, startTime, dispenses).
-     * Exact duplicates (all key fields matching an existing row) are skipped;
-     * only genuinely new rows are inserted. See {@link #importObservations()}.
+     * See {@link #importObservations()} for the in-memory duplicate-check and
+     * batched-flush performance rationale.
      *
-     * @return number of rows processed (newly inserted; exact duplicates are skipped)
+     * @return number of rows newly inserted (exact duplicates are skipped)
      */
     public int importMedications() {
         List<MedicationCsvRow> rows = parseCsv("medications.csv", MedicationCsvRow.class);
+
+        Set<String> existingKeys = medicationRepo.findAll().stream()
+                .map(m -> buildMedicationKey(
+                        m.getPatient() != null ? m.getPatient().getId() : null,
+                        m.getEncounter() != null ? m.getEncounter().getId() : null,
+                        m.getCode(), m.getStartTime(), m.getDispenses()))
+                .collect(Collectors.toCollection(HashSet::new));
+
         int count = 0;
+        int pendingSinceFlush = 0;
+
         for (MedicationCsvRow r : rows) {
             EmrPatient patient = patientCache.get(r.getPatient());
             if (patient == null) continue;
@@ -380,10 +462,12 @@ public class SyntheaImportService {
             LocalDateTime startTime = parseDateTime(r.getStart());
             Integer dispenses = parseInt(r.getDispenses());
 
-            List<EmrMedication> matches = medicationRepo
-                    .findAllByPatientAndEncounterAndCodeAndStartTimeAndDispenses(
-                            patient, encounter, r.getCode(), startTime, dispenses);
-            if (!matches.isEmpty()) continue;
+            String key = buildMedicationKey(patient.getId(),
+                    encounter != null ? encounter.getId() : null,
+                    r.getCode(), startTime, dispenses);
+
+            if (existingKeys.contains(key)) continue;
+            existingKeys.add(key);
 
             EmrMedication medication = EmrMedication.builder()
                     .patient(patient)
@@ -402,21 +486,51 @@ public class SyntheaImportService {
 
             medicationRepo.save(medication);
             count++;
+            pendingSinceFlush++;
+
+            if (pendingSinceFlush >= 1000) {
+                entityManager.flush();
+                pendingSinceFlush = 0;
+            }
         }
+
+        if (pendingSinceFlush > 0) {
+            entityManager.flush();
+        }
+
         return count;
+    }
+
+    /**
+     * Builds a composite string key for in-memory duplicate detection of
+     * medication rows. Null-safe: encounter and dispenses may be null.
+     */
+    private String buildMedicationKey(Long patientId, Long encounterId, String code,
+                                      LocalDateTime startTime, Integer dispenses) {
+        return patientId + "|" + encounterId + "|" + code + "|" + startTime + "|" + dispenses;
     }
 
     /**
      * Upserts procedures.csv into emr_procedure.
      * Natural key: composite (patient, encounter, code, procDate, baseCost).
-     * Exact duplicates are skipped; only genuinely new rows are inserted.
-     * See {@link #importObservations()}.
+     * See {@link #importObservations()} for the in-memory duplicate-check and
+     * batched-flush performance rationale.
      *
-     * @return number of rows processed (newly inserted; exact duplicates are skipped)
+     * @return number of rows newly inserted (exact duplicates are skipped)
      */
     public int importProcedures() {
         List<ProcedureCsvRow> rows = parseCsv("procedures.csv", ProcedureCsvRow.class);
+
+        Set<String> existingKeys = procedureRepo.findAll().stream()
+                .map(p -> buildProcedureKey(
+                        p.getPatient() != null ? p.getPatient().getId() : null,
+                        p.getEncounter() != null ? p.getEncounter().getId() : null,
+                        p.getCode(), p.getProcDate(), p.getBaseCost()))
+                .collect(Collectors.toCollection(HashSet::new));
+
         int count = 0;
+        int pendingSinceFlush = 0;
+
         for (ProcedureCsvRow r : rows) {
             EmrPatient patient = patientCache.get(r.getPatient());
             if (patient == null) continue;
@@ -425,10 +539,12 @@ public class SyntheaImportService {
             LocalDateTime procDate = parseDateTime(r.getDate());
             BigDecimal baseCost = parseBigDecimal(r.getBaseCost());
 
-            List<EmrProcedure> matches = procedureRepo
-                    .findAllByPatientAndEncounterAndCodeAndProcDateAndBaseCost(
-                            patient, encounter, r.getCode(), procDate, baseCost);
-            if (!matches.isEmpty()) continue;
+            String key = buildProcedureKey(patient.getId(),
+                    encounter != null ? encounter.getId() : null,
+                    r.getCode(), procDate, baseCost);
+
+            if (existingKeys.contains(key)) continue;
+            existingKeys.add(key);
 
             EmrProcedure procedure = EmrProcedure.builder()
                     .patient(patient)
@@ -443,21 +559,51 @@ public class SyntheaImportService {
 
             procedureRepo.save(procedure);
             count++;
+            pendingSinceFlush++;
+
+            if (pendingSinceFlush >= 1000) {
+                entityManager.flush();
+                pendingSinceFlush = 0;
+            }
         }
+
+        if (pendingSinceFlush > 0) {
+            entityManager.flush();
+        }
+
         return count;
+    }
+
+    /**
+     * Builds a composite string key for in-memory duplicate detection of
+     * procedure rows. Null-safe: encounter and baseCost may be null.
+     */
+    private String buildProcedureKey(Long patientId, Long encounterId, String code,
+                                     LocalDateTime procDate, BigDecimal baseCost) {
+        return patientId + "|" + encounterId + "|" + code + "|" + procDate + "|" + baseCost;
     }
 
     /**
      * Upserts immunizations.csv into emr_immunization.
      * Natural key: composite (patient, encounter, code, immDate, baseCost).
-     * Exact duplicates are skipped; only genuinely new rows are inserted.
-     * See {@link #importObservations()}.
+     * See {@link #importObservations()} for the in-memory duplicate-check and
+     * batched-flush performance rationale.
      *
-     * @return number of rows processed (newly inserted; exact duplicates are skipped)
+     * @return number of rows newly inserted (exact duplicates are skipped)
      */
     public int importImmunizations() {
         List<ImmunizationCsvRow> rows = parseCsv("immunizations.csv", ImmunizationCsvRow.class);
+
+        Set<String> existingKeys = immunizationRepo.findAll().stream()
+                .map(i -> buildImmunizationKey(
+                        i.getPatient() != null ? i.getPatient().getId() : null,
+                        i.getEncounter() != null ? i.getEncounter().getId() : null,
+                        i.getCode(), i.getImmDate(), i.getBaseCost()))
+                .collect(Collectors.toCollection(HashSet::new));
+
         int count = 0;
+        int pendingSinceFlush = 0;
+
         for (ImmunizationCsvRow r : rows) {
             EmrPatient patient = patientCache.get(r.getPatient());
             if (patient == null) continue;
@@ -466,10 +612,12 @@ public class SyntheaImportService {
             LocalDateTime immDate = parseDateTime(r.getDate());
             BigDecimal baseCost = parseBigDecimal(r.getBaseCost());
 
-            List<EmrImmunization> matches = immunizationRepo
-                    .findAllByPatientAndEncounterAndCodeAndImmDateAndBaseCost(
-                            patient, encounter, r.getCode(), immDate, baseCost);
-            if (!matches.isEmpty()) continue;
+            String key = buildImmunizationKey(patient.getId(),
+                    encounter != null ? encounter.getId() : null,
+                    r.getCode(), immDate, baseCost);
+
+            if (existingKeys.contains(key)) continue;
+            existingKeys.add(key);
 
             EmrImmunization immunization = EmrImmunization.builder()
                     .patient(patient)
@@ -482,30 +630,62 @@ public class SyntheaImportService {
 
             immunizationRepo.save(immunization);
             count++;
+            pendingSinceFlush++;
+
+            if (pendingSinceFlush >= 1000) {
+                entityManager.flush();
+                pendingSinceFlush = 0;
+            }
         }
+
+        if (pendingSinceFlush > 0) {
+            entityManager.flush();
+        }
+
         return count;
+    }
+
+    /**
+     * Builds a composite string key for in-memory duplicate detection of
+     * immunization rows. Null-safe: encounter and baseCost may be null.
+     */
+    private String buildImmunizationKey(Long patientId, Long encounterId, String code,
+                                        LocalDateTime immDate, BigDecimal baseCost) {
+        return patientId + "|" + encounterId + "|" + code + "|" + immDate + "|" + baseCost;
     }
     /**
      * Upserts allergies.csv into emr_allergy.
-     * Natural key: composite (patient, encounter, code). Uses findAllBy for
-     * consistency with the other line-item entities. If any row already
-     * matches on every key field, the CSV row is treated as an exact duplicate
-     * and is skipped entirely (no update, no insert).
+     * Natural key: composite (patient, encounter, code).
+     * See {@link #importObservations()} for the in-memory duplicate-check and
+     * batched-flush performance rationale.
      *
-     * @return number of rows processed (newly inserted; exact duplicates are skipped)
+     * @return number of rows newly inserted (exact duplicates are skipped)
      */
     public int importAllergies() {
         List<AllergyCsvRow> rows = parseCsv("allergies.csv", AllergyCsvRow.class);
+
+        Set<String> existingKeys = allergyRepo.findAll().stream()
+                .map(a -> buildAllergyKey(
+                        a.getPatient() != null ? a.getPatient().getId() : null,
+                        a.getEncounter() != null ? a.getEncounter().getId() : null,
+                        a.getCode()))
+                .collect(Collectors.toCollection(HashSet::new));
+
         int count = 0;
+        int pendingSinceFlush = 0;
+
         for (AllergyCsvRow r : rows) {
             EmrPatient patient = patientCache.get(r.getPatient());
             if (patient == null) continue;
 
             EmrEncounter encounter = encounterCache.get(r.getEncounter());
 
-            List<EmrAllergy> matches = allergyRepo
-                    .findAllByPatientAndEncounterAndCode(patient, encounter, r.getCode());
-            if (!matches.isEmpty()) continue;
+            String key = buildAllergyKey(patient.getId(),
+                    encounter != null ? encounter.getId() : null,
+                    r.getCode());
+
+            if (existingKeys.contains(key)) continue;
+            existingKeys.add(key);
 
             EmrAllergy allergy = EmrAllergy.builder()
                     .patient(patient)
@@ -525,8 +705,27 @@ public class SyntheaImportService {
 
             allergyRepo.save(allergy);
             count++;
+            pendingSinceFlush++;
+
+            if (pendingSinceFlush >= 1000) {
+                entityManager.flush();
+                pendingSinceFlush = 0;
+            }
         }
+
+        if (pendingSinceFlush > 0) {
+            entityManager.flush();
+        }
+
         return count;
+    }
+
+    /**
+     * Builds a composite string key for in-memory duplicate detection of
+     * allergy rows. Null-safe: encounter may be null.
+     */
+    private String buildAllergyKey(Long patientId, Long encounterId, String code) {
+        return patientId + "|" + encounterId + "|" + code;
     }
 
 

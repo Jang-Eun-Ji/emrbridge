@@ -30,6 +30,8 @@ public class EmrMedication {
     private LocalDateTime startTime;
     private LocalDateTime stopTime;
     private String code;
+
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
     @Column(precision = 10, scale = 2) private BigDecimal baseCost;
@@ -37,5 +39,6 @@ public class EmrMedication {
     private Integer dispenses;
     @Column(precision = 10, scale = 2) private BigDecimal totalCost;
     private String reasonCode;
+    @Column(name = "reason_description", columnDefinition = "TEXT")
     private String reasonDescription;
 }

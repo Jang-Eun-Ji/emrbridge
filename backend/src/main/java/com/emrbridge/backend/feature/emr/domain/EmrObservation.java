@@ -27,7 +27,10 @@ public class EmrObservation {
     private LocalDateTime obsDate;
     private String category;
     private String code;
+
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
+
     private String value;
     private String units;
     private String obsType;

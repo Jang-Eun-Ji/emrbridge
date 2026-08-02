@@ -29,6 +29,9 @@ public class EmrImmunization {
 
     private LocalDateTime immDate;
     private String code;
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
-    @Column(precision = 10, scale = 2) private BigDecimal baseCost;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal baseCost;
 }

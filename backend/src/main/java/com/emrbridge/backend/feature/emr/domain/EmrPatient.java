@@ -20,6 +20,13 @@ public class EmrPatient {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * Original SSN value from the Synthea source CSV (US format, XXX-XX-XXXX).
+     * Used as the unique cross-EMR patient identifier.
+     */
+    @Column(name = "ssn", unique = true, length = 11)
+    private String ssn;
+
     @Column(name = "synthea_patient_id", nullable = false, unique = true, length = 100)
     private String syntheaPatientId;
 

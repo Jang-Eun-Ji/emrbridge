@@ -27,5 +27,6 @@ public class EmrCondition {
     private LocalDate startDate;
     private LocalDate stopDate;
     private String code;
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 }

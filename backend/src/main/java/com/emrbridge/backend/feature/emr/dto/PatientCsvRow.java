@@ -11,6 +11,9 @@ public class PatientCsvRow {
     @CsvBindByName(column = "Id")
     private String id;
 
+    @CsvBindByName(column = "SSN")
+    private String ssn;
+
     @CsvBindByName(column = "BIRTHDATE")
     private String birthDate;
 
