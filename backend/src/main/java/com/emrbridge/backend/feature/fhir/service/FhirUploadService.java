@@ -108,7 +108,7 @@ public class FhirUploadService {
     @Transactional(readOnly = true)
     public int uploadAllEncounters() {
         int count = 0;
-        for (EmrEncounter emr : encounterRepo.findAll()) {
+        for (EmrEncounter emr : encounterRepo.findAllWithPatient()) {
             try {
                 MethodOutcome outcome = fhirClient.create()
                         .resource(encounterConverter.toFhir(emr))
@@ -178,7 +178,7 @@ public class FhirUploadService {
     @Transactional(readOnly = true)
     public int uploadAllConditions() {
         int count = 0;
-        for (EmrCondition emr : conditionRepo.findAll()) {
+        for (EmrCondition emr : conditionRepo.findAllWithPatientAndEncounter()) {
             try {
                 fhirClient.create().resource(conditionConverter.toFhir(emr)).execute();
                 count++;
@@ -193,7 +193,7 @@ public class FhirUploadService {
     @Transactional(readOnly = true)
     public int uploadAllObservations() {
         int count = 0;
-        for (EmrObservation emr : observationRepo.findAll()) {
+        for (EmrObservation emr : observationRepo.findAllWithPatientAndEncounter()) {
             try {
                 fhirClient.create().resource(observationConverter.toFhir(emr)).execute();
                 count++;
@@ -208,7 +208,7 @@ public class FhirUploadService {
     @Transactional(readOnly = true)
     public int uploadAllMedications() {
         int count = 0;
-        for (EmrMedication emr : medicationRepo.findAll()) {
+        for (EmrMedication emr : medicationRepo.findAllWithPatientAndEncounter()) {
             try {
                 fhirClient.create().resource(medicationConverter.toFhir(emr)).execute();
                 count++;
@@ -223,7 +223,7 @@ public class FhirUploadService {
     @Transactional(readOnly = true)
     public int uploadAllProcedures() {
         int count = 0;
-        for (EmrProcedure emr : procedureRepo.findAll()) {
+        for (EmrProcedure emr : procedureRepo.findAllWithPatientAndEncounter()) {
             try {
                 fhirClient.create().resource(procedureConverter.toFhir(emr)).execute();
                 count++;
@@ -238,7 +238,7 @@ public class FhirUploadService {
     @Transactional(readOnly = true)
     public int uploadAllAllergies() {
         int count = 0;
-        for (EmrAllergy emr : allergyRepo.findAll()) {
+        for (EmrAllergy emr : allergyRepo.findAllWithPatientAndEncounter()) {
             try {
                 fhirClient.create().resource(allergyConverter.toFhir(emr)).execute();
                 count++;
@@ -253,7 +253,7 @@ public class FhirUploadService {
     @Transactional(readOnly = true)
     public int uploadAllImmunizations() {
         int count = 0;
-        for (EmrImmunization emr : immunizationRepo.findAll()) {
+        for (EmrImmunization emr : immunizationRepo.findAllWithPatientAndEncounter()) {
             try {
                 fhirClient.create().resource(immunizationConverter.toFhir(emr)).execute();
                 count++;
@@ -268,7 +268,7 @@ public class FhirUploadService {
     @Transactional(readOnly = true)
     public int uploadAllCareplans() {
         int count = 0;
-        for (EmrCareplan emr : careplanRepo.findAll()) {
+        for (EmrCareplan emr : careplanRepo.findAllWithPatientAndEncounter()) {
             try {
                 fhirClient.create().resource(careplanConverter.toFhir(emr)).execute();
                 count++;

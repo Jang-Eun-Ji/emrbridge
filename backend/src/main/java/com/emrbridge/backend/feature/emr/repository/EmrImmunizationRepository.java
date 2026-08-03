@@ -4,6 +4,7 @@ import com.emrbridge.backend.feature.emr.domain.EmrEncounter;
 import com.emrbridge.backend.feature.emr.domain.EmrImmunization;
 import com.emrbridge.backend.feature.emr.domain.EmrPatient;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -18,4 +19,7 @@ public interface EmrImmunizationRepository extends JpaRepository<EmrImmunization
     List<EmrImmunization> findAllByPatientAndEncounterAndCodeAndImmDateAndBaseCost(
             EmrPatient patient, EmrEncounter encounter, String code,
             LocalDateTime immDate, BigDecimal baseCost);
+
+    @Query("SELECT i FROM EmrImmunization i JOIN FETCH i.patient LEFT JOIN FETCH i.encounter")
+    List<EmrImmunization> findAllWithPatientAndEncounter();
 }
