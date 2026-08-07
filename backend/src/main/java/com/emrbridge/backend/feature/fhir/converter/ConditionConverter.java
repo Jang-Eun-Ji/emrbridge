@@ -4,6 +4,8 @@ import com.emrbridge.backend.feature.emr.domain.EmrCondition;
 import org.hl7.fhir.r4.model.*;
 import org.springframework.stereotype.Component;
 
+import static com.emrbridge.backend.feature.fhir.converter.FhirDateTimeUtil.toDateTimeTypeFromDate;
+
 @Component
 public class ConditionConverter {
 
@@ -26,11 +28,11 @@ public class ConditionConverter {
         }
 
         if (emr.getStartDate() != null) {
-            condition.setOnset(new DateTimeType(emr.getStartDate().toString()));
+            condition.setOnset(toDateTimeTypeFromDate(emr.getStartDate()));
         }
 
         if (emr.getStopDate() != null) {
-            condition.setAbatement(new DateTimeType(emr.getStopDate().toString()));
+            condition.setAbatement(toDateTimeTypeFromDate(emr.getStopDate()));
         }
 
         condition.setClinicalStatus(new CodeableConcept().addCoding(

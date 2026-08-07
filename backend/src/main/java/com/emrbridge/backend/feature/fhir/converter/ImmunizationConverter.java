@@ -4,6 +4,8 @@ import com.emrbridge.backend.feature.emr.domain.EmrImmunization;
 import org.hl7.fhir.r4.model.*;
 import org.springframework.stereotype.Component;
 
+import static com.emrbridge.backend.feature.fhir.converter.FhirDateTimeUtil.toDateTimeType;
+
 @Component
 public class ImmunizationConverter {
 
@@ -28,7 +30,7 @@ public class ImmunizationConverter {
         }
 
         if (emr.getImmDate() != null) {
-            immunization.setOccurrence(new DateTimeType(emr.getImmDate().toString()));
+            immunization.setOccurrence(toDateTimeType(emr.getImmDate()));
         }
 
         immunization.setPrimarySource(true);

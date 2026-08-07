@@ -4,6 +4,8 @@ import com.emrbridge.backend.feature.emr.domain.EmrEncounter;
 import org.hl7.fhir.r4.model.*;
 import org.springframework.stereotype.Component;
 
+import static com.emrbridge.backend.feature.fhir.converter.FhirDateTimeUtil.toDateTimeType;
+
 @Component
 public class EncounterConverter {
 
@@ -26,9 +28,9 @@ public class EncounterConverter {
 
         if (emr.getStartTime() != null) {
             Period period = new Period();
-            period.setStartElement(new DateTimeType(emr.getStartTime().toString()));
+            period.setStartElement(toDateTimeType(emr.getStartTime()));
             if (emr.getStopTime() != null) {
-                period.setEndElement(new DateTimeType(emr.getStopTime().toString()));
+                period.setEndElement(toDateTimeType(emr.getStopTime()));
             }
             encounter.setPeriod(period);
         }

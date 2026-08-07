@@ -4,6 +4,8 @@ import com.emrbridge.backend.feature.emr.domain.EmrProcedure;
 import org.hl7.fhir.r4.model.*;
 import org.springframework.stereotype.Component;
 
+import static com.emrbridge.backend.feature.fhir.converter.FhirDateTimeUtil.toDateTimeType;
+
 @Component
 public class ProcedureConverter {
 
@@ -28,7 +30,7 @@ public class ProcedureConverter {
         }
 
         if (emr.getProcDate() != null) {
-            procedure.setPerformed(new DateTimeType(emr.getProcDate().toString()));
+            procedure.setPerformed(toDateTimeType(emr.getProcDate()));
         }
 
         if (emr.getReasonCode() != null) {

@@ -4,6 +4,8 @@ import com.emrbridge.backend.feature.emr.domain.EmrMedication;
 import org.hl7.fhir.r4.model.*;
 import org.springframework.stereotype.Component;
 
+import static com.emrbridge.backend.feature.fhir.converter.FhirDateTimeUtil.toDateTimeType;
+
 @Component
 public class MedicationConverter {
 
@@ -29,7 +31,7 @@ public class MedicationConverter {
         }
 
         if (emr.getStartTime() != null) {
-            request.setAuthoredOnElement(new DateTimeType(emr.getStartTime().toString()));
+            request.setAuthoredOnElement(toDateTimeType(emr.getStartTime()));
         }
 
         if (emr.getReasonCode() != null) {

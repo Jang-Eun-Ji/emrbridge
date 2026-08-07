@@ -4,6 +4,8 @@ import com.emrbridge.backend.feature.emr.domain.EmrObservation;
 import org.hl7.fhir.r4.model.*;
 import org.springframework.stereotype.Component;
 
+import static com.emrbridge.backend.feature.fhir.converter.FhirDateTimeUtil.toDateTimeType;
+
 @Component
 public class ObservationConverter {
 
@@ -34,7 +36,7 @@ public class ObservationConverter {
         }
 
         if (emr.getObsDate() != null) {
-            observation.setEffective(new DateTimeType(emr.getObsDate().toString()));
+            observation.setEffective(toDateTimeType(emr.getObsDate()));
         }
 
         if (emr.getValue() != null) {

@@ -4,6 +4,8 @@ import com.emrbridge.backend.feature.emr.domain.EmrCareplan;
 import org.hl7.fhir.r4.model.*;
 import org.springframework.stereotype.Component;
 
+import static com.emrbridge.backend.feature.fhir.converter.FhirDateTimeUtil.toDateTimeTypeFromDate;
+
 @Component
 public class CareplanConverter {
 
@@ -32,8 +34,8 @@ public class CareplanConverter {
 
         if (emr.getStartDate() != null || emr.getStopDate() != null) {
             Period period = new Period();
-            if (emr.getStartDate() != null) period.setStartElement(new DateTimeType(emr.getStartDate().toString()));
-            if (emr.getStopDate() != null) period.setEndElement(new DateTimeType(emr.getStopDate().toString()));
+            if (emr.getStartDate() != null) period.setStartElement(toDateTimeTypeFromDate(emr.getStartDate()));
+            if (emr.getStopDate() != null) period.setEndElement(toDateTimeTypeFromDate(emr.getStopDate()));
             carePlan.setPeriod(period);
         }
 

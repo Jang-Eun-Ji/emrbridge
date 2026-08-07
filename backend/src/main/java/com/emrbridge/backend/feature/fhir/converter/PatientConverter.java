@@ -4,6 +4,9 @@ import com.emrbridge.backend.feature.emr.domain.EmrPatient;
 import org.hl7.fhir.r4.model.*;
 import org.springframework.stereotype.Component;
 
+import static com.emrbridge.backend.feature.fhir.converter.FhirDateTimeUtil.toDateType;
+import static com.emrbridge.backend.feature.fhir.converter.FhirDateTimeUtil.toDateTimeTypeFromDate;
+
 @Component
 public class PatientConverter {
 
@@ -49,13 +52,12 @@ public class PatientConverter {
 
         // 생년월일
         if (emr.getBirthDate() != null) {
-            patient.setBirthDateElement(new DateType(emr.getBirthDate().toString()));
+            patient.setBirthDateElement(toDateType(emr.getBirthDate()));
         }
 
         // 사망일 (있으면)
         if (emr.getDeathDate() != null) {
-            DateTimeType deceased = new DateTimeType(emr.getDeathDate().toString());
-            patient.setDeceased(deceased);
+            patient.setDeceased(toDateTimeTypeFromDate(emr.getDeathDate()));
         }
 
         // 주소
