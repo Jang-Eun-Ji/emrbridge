@@ -11,6 +11,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.core.io.ClassPathResource;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.io.FileReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -178,18 +181,9 @@ public class SyntheaImportService {
      * @throws RuntimeException if patients.csv cannot be read or parsed
      */
     public int importPatients() {
-        String filePath = csvImportPath + "/patients.csv";
+        List<PatientCsvRow> rows = parseCsv("patients.csv", PatientCsvRow.class);
 
-        try (FileReader reader = new FileReader(filePath, StandardCharsets.UTF_8)) {
-
-            CsvToBean<PatientCsvRow> csvToBean = new CsvToBeanBuilder<PatientCsvRow>(reader)
-                    .withType(PatientCsvRow.class)
-                    .withIgnoreLeadingWhiteSpace(true)
-                    .build();
-
-            List<PatientCsvRow> rows = csvToBean.parse();
-
-            int savedCount = 0;
+        int count = 0;
 
             for (PatientCsvRow row : rows) {
                 if (row.getId() == null || row.getId().isBlank()) {
@@ -218,14 +212,10 @@ public class SyntheaImportService {
 
                 patientRepo.save(patient);
                 patientCache.put(row.getId(), patient); // keep cache in sync after save
-                savedCount++;
+                count++;
             }
 
-            return savedCount;
-
-        } catch (Exception e) {
-            throw new RuntimeException("patients.csv import failed: " + e.getMessage(), e);
-        }
+            return count;
     }
 
     /**
@@ -775,13 +765,20 @@ public class SyntheaImportService {
      * @throws RuntimeException if the file cannot be found, read, or parsed
      */
     private <T> List<T> parseCsv(String filename, Class<T> type) {
-        String path = csvImportPath + "/" + filename;
-        try (FileReader reader = new FileReader(path, StandardCharsets.UTF_8)) {
+        try (
+                BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(
+                                new ClassPathResource("csv/" + filename).getInputStream(),
+                                StandardCharsets.UTF_8
+                        )
+                )
+        ) {
             return new CsvToBeanBuilder<T>(reader)
                     .withType(type)
                     .withIgnoreLeadingWhiteSpace(true)
                     .build()
                     .parse();
+
         } catch (Exception e) {
             throw new RuntimeException(filename + " 파싱 실패: " + e.getMessage(), e);
         }

@@ -22,7 +22,7 @@ spring:
         batch_size: 1000
         order_inserts: true
         order_updates: true
-      ddl-auto: update
+      ddl-auto: create
     show-sql: true
     properties:
       hibernate:
@@ -37,7 +37,7 @@ spring:
 
 csv:
   import:
-    path: src/main/resources/csv  # Synthea CSV ??
+    path: csv  # Synthea CSV
 
 fhir:
   server:
