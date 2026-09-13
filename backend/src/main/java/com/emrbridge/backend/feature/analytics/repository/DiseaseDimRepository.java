@@ -1,30 +1,11 @@
 package com.emrbridge.backend.feature.analytics.repository;
 
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Repository;
+import com.emrbridge.backend.feature.analytics.domain.DiseaseDim;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-@Repository
-public class DiseaseDimRepository {
+import java.util.Optional;
 
-    private final JdbcTemplate jdbcTemplate;
+public interface DiseaseDimRepository extends JpaRepository<DiseaseDim, Integer> {
 
-    public DiseaseDimRepository(@Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
-
-    public int upsert(String diseaseCode, String diseaseName, String diseaseCategory) {
-        return jdbcTemplate.queryForObject(
-                """
-                INSERT INTO disease_dim (disease_code, disease_name, disease_category)
-                VALUES (?, ?, ?)
-                ON CONFLICT (disease_code) DO UPDATE SET disease_name = EXCLUDED.disease_name
-                RETURNING disease_id
-                """,
-                Integer.class,
-                diseaseCode,
-                diseaseName,
-                diseaseCategory
-        );
-    }
+    Optional<DiseaseDim> findByDiseaseCode(String diseaseCode);
 }

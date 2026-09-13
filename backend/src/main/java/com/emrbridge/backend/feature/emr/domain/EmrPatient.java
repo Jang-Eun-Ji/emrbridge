@@ -16,6 +16,8 @@ import java.time.LocalDateTime;
 @Builder
 public class EmrPatient {
 
+    // Primary key for the EmrPatient entity.
+    // auto increment
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -27,6 +29,7 @@ public class EmrPatient {
     @Column(name = "ssn", unique = true, length = 11)
     private String ssn;
 
+    // Unique patient identifier from the Synthea source CSV (UUID format).
     @Column(name = "synthea_patient_id", nullable = false, unique = true, length = 100)
     private String syntheaPatientId;
 

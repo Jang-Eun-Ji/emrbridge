@@ -93,6 +93,10 @@ public class FlywayMultiDatabaseConfig {
                 beanFactory.getBeanDefinition("entityManagerFactory")
                         .setDependsOn("emrFlyway", "analyticsFlyway");
             }
+            if (beanFactory.containsBeanDefinition("analyticsEntityManagerFactory")) {
+                beanFactory.getBeanDefinition("analyticsEntityManagerFactory")
+                        .setDependsOn("analyticsFlyway");
+            }
         };
     }
 }

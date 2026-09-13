@@ -1,22 +1,22 @@
 package com.emrbridge.backend.feature.analytics.service;
 
+import com.emrbridge.backend.feature.analytics.domain.*;
 import com.emrbridge.backend.feature.analytics.dto.AnalyticsEtlResult;
 import com.emrbridge.backend.feature.analytics.repository.*;
 import com.emrbridge.backend.feature.analytics.util.AnalyticsMapper;
-import com.emrbridge.backend.feature.analytics.util.FhirIdentifierResolver;
-import com.emrbridge.backend.feature.emr.domain.EmrEncounter;
-import com.emrbridge.backend.feature.emr.domain.EmrPatient;
-import com.emrbridge.backend.feature.emr.repository.EmrEncounterRepository;
-import com.emrbridge.backend.feature.emr.repository.EmrPatientRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -24,15 +24,13 @@ import java.util.stream.Collectors;
 public class AnalyticsEtlService {
 
     private final FhirExtractService fhirExtractService;
-    private final EmrPatientRepository emrPatientRepository;
-    private final EmrEncounterRepository emrEncounterRepository;
-    private final AnalyticsEtlRepository analyticsEtlRepository;
+    private final VisitFactRepository visitFactRepository;
     private final RegionDimRepository regionDimRepository;
     private final PatientDimRepository patientDimRepository;
     private final DiseaseDimRepository diseaseDimRepository;
     private final TimeDimRepository timeDimRepository;
-    private final VisitFactRepository visitFactRepository;
 
+    @Transactional(transactionManager = "analyticsTransactionManager")
     public AnalyticsEtlResult runEtl() {
         log.info("Analytics ETL 시작 (FHIR → Analytics DB)");
 
@@ -40,113 +38,77 @@ public class AnalyticsEtlService {
         List<Encounter> fhirEncounters = fhirExtractService.fetchAllEncounters();
         List<Condition> fhirConditions = fhirExtractService.fetchAllConditions();
 
-        FhirIdentifierResolver identifierResolver = new FhirIdentifierResolver(fhirPatients, fhirEncounters);
+        visitFactRepository.truncateAll();
 
-        Map<String, Long> emrPatientIdBySyntheaId = emrPatientRepository.findAll().stream()
-                .collect(Collectors.toMap(EmrPatient::getSyntheaPatientId, EmrPatient::getId));
-        Map<String, EmrPatient> emrPatientBySyntheaId = emrPatientRepository.findAll().stream()
-                .collect(Collectors.toMap(EmrPatient::getSyntheaPatientId, p -> p));
-        Map<String, Long> emrEncounterIdBySyntheaId = emrEncounterRepository.findAll().stream()
-                .collect(Collectors.toMap(EmrEncounter::getSyntheaId, EmrEncounter::getId));
-
-        analyticsEtlRepository.truncateAll();
-
-        Map<String, Integer> regionIdByName = new HashMap<>();
-        Map<Long, Integer> patientDimIdByEmrId = new HashMap<>();
-        Map<String, Integer> diseaseIdByCode = new HashMap<>();
-        Map<String, Integer> timeIdByYearMonth = new HashMap<>();
+        Map<String, RegionDim> regionByName = new HashMap<>();
+        Map<Long, PatientDim> patientDimByFhirId = new HashMap<>();
+        Map<String, DiseaseDim> diseaseByCode = new HashMap<>();
+        Map<String, TimeDim> timeByYearMonth = new HashMap<>();
 
         int skippedPatients = 0;
         int patientDimRows = 0;
         LocalDate today = LocalDate.now();
 
         for (Patient fhirPatient : fhirPatients) {
-            String syntheaPatientId = identifierResolver.extractPatientSyntheaId(fhirPatient);
-            if (syntheaPatientId == null) {
+            Long fhirPatientId = fhirId(fhirPatient.getIdElement());
+            if (fhirPatientId == null) {
                 skippedPatients++;
                 continue;
             }
-
-            Long emrPatientId = emrPatientIdBySyntheaId.get(syntheaPatientId);
-            if (emrPatientId == null) {
-                log.warn("EMR patient not found for synthea id: {}", syntheaPatientId);
-                skippedPatients++;
-                continue;
-            }
-
-            EmrPatient emrPatient = emrPatientBySyntheaId.get(syntheaPatientId);
 
             LocalDate birthDate = toLocalDate(fhirPatient.getBirthDateElement());
-            if (birthDate == null && emrPatient != null) {
-                birthDate = emrPatient.getBirthDate();
-            }
             if (birthDate == null) {
                 skippedPatients++;
                 continue;
             }
 
             String gender = AnalyticsMapper.toAnalyticsGender(fhirPatient.getGender());
-            if (gender == null && emrPatient != null && emrPatient.getGender() != null) {
-                gender = switch (emrPatient.getGender().toUpperCase()) {
-                    case "M", "MALE" -> "M";
-                    case "F", "FEMALE" -> "F";
-                    default -> null;
-                };
-            }
             if (gender == null) {
                 skippedPatients++;
                 continue;
             }
 
-            String state = firstNonBlank(extractAddressField(fhirPatient, Address::getState), emrPatient != null ? emrPatient.getState() : null, "Unknown");
-            String city = firstNonBlank(extractAddressField(fhirPatient, Address::getCity), emrPatient != null ? emrPatient.getCity() : null, "Unknown");
-            String county = emrPatient != null ? emrPatient.getCounty() : null;
+            String state = firstNonBlank(extractAddressField(fhirPatient, Address::getState), "Unknown");
+            String city = firstNonBlank(extractAddressField(fhirPatient, Address::getCity), "Unknown");
+            String county = extractAddressField(fhirPatient, Address::getDistrict);
 
-            int regionId = getOrCreateRegion(regionIdByName, state, county, city);
+            RegionDim region = getOrCreateRegion(regionByName, state, county, city);
 
             String firstName = fhirPatient.getNameFirstRep().getGivenAsSingleString();
             String lastName = fhirPatient.getNameFirstRep().getFamily();
-            if ((firstName == null || firstName.isBlank()) && emrPatient != null) {
-                firstName = emrPatient.getFirstName();
-            }
-            if ((lastName == null || lastName.isBlank()) && emrPatient != null) {
-                lastName = emrPatient.getLastName();
-            }
 
             int age = AnalyticsMapper.calculateAge(birthDate, today);
             String ageGroup = AnalyticsMapper.toAgeGroup(age);
 
-            int patientDimId = patientDimRepository.upsert(
-                    emrPatientId, firstName, lastName, gender, birthDate, age, ageGroup, regionId
+            PatientDim patientDim = upsertPatient(
+                    fhirPatientId, firstName, lastName, gender, birthDate, age, ageGroup, region
             );
 
-            patientDimIdByEmrId.put(emrPatientId, patientDimId);
+            patientDimByFhirId.put(fhirPatientId, patientDim);
             patientDimRows++;
         }
 
-        Map<String, List<Condition>> conditionsByEncounterSyntheaId =
-                identifierResolver.groupConditionsByEncounterSyntheaId(fhirConditions);
+        Map<Long, List<Condition>> conditionsByEncounterFhirId = groupConditionsByEncounterFhirId(fhirConditions);
 
         int skippedEncounters = 0;
         int visitFactRows = 0;
         Map<String, Boolean> firstVisitByPatientDisease = new HashMap<>();
 
         for (Encounter encounter : fhirEncounters) {
-            String encounterSyntheaId = identifierResolver.extractEncounterSyntheaId(encounter);
-            if (encounterSyntheaId == null) {
+            Long fhirEncounterId = fhirId(encounter.getIdElement());
+            if (fhirEncounterId == null) {
                 skippedEncounters++;
                 continue;
             }
 
-            String patientSyntheaId = identifierResolver.resolvePatientSyntheaId(encounter.getSubject());
-            if (patientSyntheaId == null) {
+            Long fhirPatientId = fhirIdFromReference(encounter.getSubject());
+            if (fhirPatientId == null) {
                 skippedEncounters++;
                 continue;
             }
 
-            Long emrPatientId = emrPatientIdBySyntheaId.get(patientSyntheaId);
-            Integer patientDimId = emrPatientId != null ? patientDimIdByEmrId.get(emrPatientId) : null;
-            if (patientDimId == null) {
+            PatientDim patientDim = patientDimByFhirId.get(fhirPatientId);
+            if (patientDim == null) {
                 skippedEncounters++;
                 continue;
             }
@@ -157,33 +119,36 @@ public class AnalyticsEtlService {
                 continue;
             }
 
-            EmrPatient emrPatient = emrPatientBySyntheaId.get(patientSyntheaId);
-            String state = emrPatient != null && emrPatient.getState() != null ? emrPatient.getState() : "Unknown";
-            String city = emrPatient != null && emrPatient.getCity() != null ? emrPatient.getCity() : "Unknown";
-            String county = emrPatient != null ? emrPatient.getCounty() : null;
-            int regionId = getOrCreateRegion(regionIdByName, state, county, city);
-            int timeId = getOrCreateTimeDim(timeIdByYearMonth, visitDate);
-            Long emrEncounterId = emrEncounterIdBySyntheaId.get(encounterSyntheaId);
+            RegionDim region = patientDim.getRegion();
+            TimeDim timeDim = getOrCreateTimeDim(timeByYearMonth, visitDate);
 
-            List<DiseaseInfo> diseases = resolveDiseases(encounter, conditionsByEncounterSyntheaId.get(encounterSyntheaId));
+            List<DiseaseInfo> diseases = resolveDiseasesFromConditions(
+                    conditionsByEncounterFhirId.get(fhirEncounterId)
+            );
             if (diseases.isEmpty()) {
-                diseases = List.of(new DiseaseInfo(
-                        AnalyticsMapper.unknownDiseaseCode(),
-                        AnalyticsMapper.unknownDiseaseName()
-                ));
+                skippedEncounters++;
+                continue;
             }
 
             for (DiseaseInfo disease : diseases) {
-                int diseaseId = getOrCreateDisease(diseaseIdByCode, disease.code(), disease.name());
+                DiseaseDim diseaseDim = getOrCreateDisease(diseaseByCode, disease.code(), disease.name());
 
-                String visitTypeKey = patientDimId + ":" + disease.code();
+                String visitTypeKey = patientDim.getPatientId() + ":" + disease.code();
                 String visitType = firstVisitByPatientDisease.putIfAbsent(visitTypeKey, Boolean.TRUE) == null
                         ? "first visit"
                         : "follow-up";
 
-                visitFactRepository.insert(
-                        patientDimId, diseaseId, timeId, regionId, visitDate, visitType, emrEncounterId
-                );
+                visitFactRepository.save(VisitFact.builder()
+                        .patient(patientDim)
+                        .disease(diseaseDim)
+                        .time(timeDim)
+                        .region(region)
+                        .visitDate(visitDate)
+                        .visitCount(1)
+                        .visitType(visitType)
+                        .originalEncounterId(fhirEncounterId)
+                        .build());
+
                 visitFactRows++;
             }
         }
@@ -195,75 +160,106 @@ public class AnalyticsEtlService {
                 .patientsFromFhir(fhirPatients.size())
                 .encountersFromFhir(fhirEncounters.size())
                 .conditionsFromFhir(fhirConditions.size())
-                .regionDimRows(regionIdByName.size())
+                .regionDimRows(regionByName.size())
                 .patientDimRows(patientDimRows)
-                .diseaseDimRows(diseaseIdByCode.size())
-                .timeDimRows(timeIdByYearMonth.size())
+                .diseaseDimRows(diseaseByCode.size())
+                .timeDimRows(timeByYearMonth.size())
                 .visitFactRows(visitFactRows)
                 .skippedPatients(skippedPatients)
                 .skippedEncounters(skippedEncounters)
                 .build();
     }
 
-    private int getOrCreateRegion(Map<String, Integer> cache, String state, String county, String city) {
-        String regionName = AnalyticsMapper.buildRegionName(state, city);
-        return cache.computeIfAbsent(regionName, name ->
-                regionDimRepository.upsert(state, county, city, regionName));
+    private PatientDim upsertPatient(
+            Long fhirPatientId,
+            String firstName,
+            String lastName,
+            String gender,
+            LocalDate birthDate,
+            int age,
+            String ageGroup,
+            RegionDim region
+    ) {
+        PatientDim patientDim = patientDimRepository.findByOriginalPatientId(fhirPatientId)
+                .orElseGet(() -> PatientDim.builder().originalPatientId(fhirPatientId).build());
+
+        patientDim.setFirstName(firstName);
+        patientDim.setLastName(lastName);
+        patientDim.setGender(gender);
+        patientDim.setBirthDate(birthDate);
+        patientDim.setAge(age);
+        patientDim.setAgeGroup(ageGroup);
+        patientDim.setRegion(region);
+        patientDim.setRegistrationDate(birthDate);
+
+        return patientDimRepository.save(patientDim);
     }
 
-    private int getOrCreateTimeDim(Map<String, Integer> cache, LocalDate visitDate) {
+    private RegionDim getOrCreateRegion(Map<String, RegionDim> cache, String state, String county, String city) {
+        String regionName = AnalyticsMapper.buildRegionName(state, city);
+        return cache.computeIfAbsent(regionName, name ->
+                regionDimRepository.findByRegionName(regionName)
+                        .orElseGet(() -> regionDimRepository.save(RegionDim.builder()
+                                .state(state)
+                                .county(county)
+                                .city(city)
+                                .regionName(regionName)
+                                .build()))
+        );
+    }
+
+    private TimeDim getOrCreateTimeDim(Map<String, TimeDim> cache, LocalDate visitDate) {
         int year = visitDate.getYear();
         int month = visitDate.getMonthValue();
         int quarter = (month - 1) / 3 + 1;
         String yearMonth = String.format("%04d-%02d", year, month);
 
         return cache.computeIfAbsent(yearMonth, key ->
-                timeDimRepository.upsert(year, month, quarter, yearMonth));
+                timeDimRepository.findByYearMonth(yearMonth)
+                        .orElseGet(() -> timeDimRepository.save(TimeDim.builder()
+                                .year(year)
+                                .month(month)
+                                .quarter(quarter)
+                                .yearMonth(yearMonth)
+                                .build()))
+        );
     }
 
-    private int getOrCreateDisease(Map<String, Integer> cache, String code, String name) {
-        String diseaseCode = code != null && !code.isBlank() ? code : AnalyticsMapper.unknownDiseaseCode();
-        String diseaseName = name != null && !name.isBlank() ? name : AnalyticsMapper.unknownDiseaseName();
-        String category = AnalyticsMapper.resolveDiseaseCategory(diseaseName);
-
-        return cache.computeIfAbsent(diseaseCode, key ->
-                diseaseDimRepository.upsert(diseaseCode, diseaseName, category));
+    private DiseaseDim getOrCreateDisease(Map<String, DiseaseDim> cache, String code, String name) {
+        return cache.computeIfAbsent(code, key ->
+                diseaseDimRepository.findByDiseaseCode(code)
+                        .orElseGet(() -> diseaseDimRepository.save(DiseaseDim.builder()
+                                .diseaseCode(code)
+                                .diseaseName(name != null && !name.isBlank() ? name : code)
+                                .diseaseCategory(AnalyticsMapper.resolveDiseaseCategory(code, name))
+                                .build()))
+        );
     }
 
-    private List<DiseaseInfo> resolveDiseases(Encounter encounter, List<Condition> linkedConditions) {
+    private Map<Long, List<Condition>> groupConditionsByEncounterFhirId(List<Condition> conditions) {
+        Map<Long, List<Condition>> grouped = new HashMap<>();
+        for (Condition condition : conditions) {
+            Long encounterFhirId = fhirIdFromReference(condition.getEncounter());
+            if (encounterFhirId != null) {
+                grouped.computeIfAbsent(encounterFhirId, key -> new ArrayList<>()).add(condition);
+            }
+        }
+        return grouped;
+    }
+
+    /** Disease names/codes come only from FHIR Condition.code (no Encounter reason/type fallback). */
+    private List<DiseaseInfo> resolveDiseasesFromConditions(List<Condition> linkedConditions) {
         List<DiseaseInfo> diseases = new ArrayList<>();
-
-        if (linkedConditions != null) {
-            for (Condition condition : linkedConditions) {
-                Coding coding = firstCoding(condition.getCode());
-                if (coding != null) {
-                    diseases.add(new DiseaseInfo(coding.getCode(), coding.getDisplay()));
-                }
+        if (linkedConditions == null) {
+            return diseases;
+        }
+        for (Condition condition : linkedConditions) {
+            Coding coding = firstCoding(condition.getCode());
+            if (coding != null && coding.hasCode() && !coding.getCode().isBlank()) {
+                diseases.add(new DiseaseInfo(coding.getCode(), coding.getDisplay()));
             }
         }
-
-        if (diseases.isEmpty() && encounter.hasReasonCode()) {
-            for (CodeableConcept reason : encounter.getReasonCode()) {
-                Coding coding = firstCoding(reason);
-                if (coding != null) {
-                    diseases.add(new DiseaseInfo(coding.getCode(), coding.getDisplay()));
-                }
-            }
-        }
-
-        if (diseases.isEmpty() && encounter.hasType()) {
-            for (CodeableConcept type : encounter.getType()) {
-                Coding coding = firstCoding(type);
-                if (coding != null) {
-                    diseases.add(new DiseaseInfo(coding.getCode(), coding.getDisplay()));
-                }
-            }
-        }
-
-        return diseases.stream()
-                .filter(d -> d.code() != null && !d.code().isBlank())
-                .distinct()
-                .toList();
+        return diseases.stream().distinct().toList();
     }
 
     private Coding firstCoding(CodeableConcept concept) {
@@ -271,6 +267,29 @@ public class AnalyticsEtlService {
             return null;
         }
         return concept.getCodingFirstRep();
+    }
+
+    private Long fhirId(IIdType id) {
+        if (id == null || !id.hasIdPart()) {
+            return null;
+        }
+        return parseFhirId(id.getIdPart());
+    }
+
+    private Long fhirIdFromReference(Reference reference) {
+        if (reference == null || reference.getReferenceElement() == null) {
+            return null;
+        }
+        return fhirId(reference.getReferenceElement());
+    }
+
+    private Long parseFhirId(String idPart) {
+        try {
+            return Long.parseLong(idPart);
+        } catch (NumberFormatException e) {
+            log.warn("Non-numeric FHIR id skipped: {}", idPart);
+            return null;
+        }
     }
 
     private LocalDate toLocalDate(DateTimeType dateTimeType) {

@@ -1,31 +1,11 @@
 package com.emrbridge.backend.feature.analytics.repository;
 
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Repository;
+import com.emrbridge.backend.feature.analytics.domain.TimeDim;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-@Repository
-public class TimeDimRepository {
+import java.util.Optional;
 
-    private final JdbcTemplate jdbcTemplate;
+public interface TimeDimRepository extends JpaRepository<TimeDim, Integer> {
 
-    public TimeDimRepository(@Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
-
-    public int upsert(int year, int month, int quarter, String yearMonth) {
-        return jdbcTemplate.queryForObject(
-                """
-                INSERT INTO time_dim (year, month, quarter, year_month)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (year_month) DO UPDATE SET year = EXCLUDED.year
-                RETURNING time_id
-                """,
-                Integer.class,
-                year,
-                month,
-                quarter,
-                yearMonth
-        );
-    }
+    Optional<TimeDim> findByYearMonth(String yearMonth);
 }

@@ -1,43 +1,15 @@
 package com.emrbridge.backend.feature.analytics.repository;
 
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Repository;
+import com.emrbridge.backend.feature.analytics.domain.VisitFact;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.Date;
-import java.time.LocalDate;
+public interface VisitFactRepository extends JpaRepository<VisitFact, Integer> {
 
-@Repository
-public class VisitFactRepository {
-
-    private final JdbcTemplate jdbcTemplate;
-
-    public VisitFactRepository(@Qualifier("analyticsJdbcTemplate") JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
-
-    public void insert(
-            int patientDimId,
-            int diseaseDimId,
-            int timeDimId,
-            int regionDimId,
-            LocalDate visitDate,
-            String visitType,
-            Long originalEncounterId
-    ) {
-        jdbcTemplate.update(
-                """
-                INSERT INTO visit_facts
-                    (patient_id, disease_id, time_id, region_id, visit_date, visit_count, visit_type, original_encounter_id)
-                VALUES (?, ?, ?, ?, ?, 1, ?, ?)
-                """,
-                patientDimId,
-                diseaseDimId,
-                timeDimId,
-                regionDimId,
-                Date.valueOf(visitDate),
-                visitType,
-                originalEncounterId
-        );
-    }
+    @Modifying
+    @Transactional(transactionManager = "analyticsTransactionManager")
+    @Query(value = "TRUNCATE visit_facts, patient_dim, disease_dim, region_dim, time_dim RESTART IDENTITY CASCADE", nativeQuery = true)
+    void truncateAll();
 }

@@ -21,6 +21,7 @@ public class AnalyticsController {
      */
     @PostMapping("/etl/run")
     public ResponseEntity<AnalyticsEtlResult> runEtl() {
+        System.out.println("=== Running ETL ===");
         return ResponseEntity.ok(analyticsEtlService.runEtl());
     }
 }
