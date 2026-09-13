@@ -28,6 +28,23 @@ services:
       timeout: 5s
       retries: 10
 
+  analytics-db:
+    image: postgres:16
+    container_name: emrbridge-analytics-db
+    environment:
+      POSTGRES_DB: analytics
+      POSTGRES_USER: analytics
+      POSTGRES_PASSWORD: analytics
+    ports:
+      - "5434:5432"
+    volumes:
+      - analytics-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U analytics" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   hapi-fhir:
     image: hapiproject/hapi:v8.2.0-1
     container_name: emrbridge-hapi-fhir
@@ -49,3 +66,4 @@ services:
 volumes:
   emr-db-data:
   fhir-db-data:
+  analytics-db-data:

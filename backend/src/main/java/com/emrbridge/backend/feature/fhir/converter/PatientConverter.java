@@ -19,7 +19,7 @@ public class PatientConverter {
     public Patient toFhir(EmrPatient emr) {
         Patient patient = new Patient();
 
-        // ID (Synthea ID를 FHIR identifier로)
+        // ID를 FHIR identifier로
         patient.addIdentifier()
                 .setSystem("http://emrbridge.com/patient-id")
                 .setValue(emr.getSyntheaPatientId());
