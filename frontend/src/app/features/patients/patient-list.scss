@@ -1,0 +1,28 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+
+  mat-form-field {
+    width: min(360px, 100%);
+  }
+}
+
+.count {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+table {
+  width: 100%;
+  background: transparent;
+}
+
+.mat-mdc-row {
+  cursor: pointer;
+}
+
+.empty {
+  margin: 24px 0;
+  color: var(--mat-sys-on-surface-variant);
+}

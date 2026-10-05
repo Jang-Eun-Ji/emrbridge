@@ -1,0 +1,37 @@
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 8px 0 16px;
+
+  article {
+    padding: 16px 18px;
+    border-radius: 16px;
+    background: var(--mat-sys-primary-container);
+    color: var(--mat-sys-on-primary-container);
+  }
+
+  span {
+    display: block;
+    font: var(--mat-sys-label-large);
+  }
+
+  strong {
+    display: block;
+    margin-top: 8px;
+    font: var(--mat-sys-headline-medium);
+  }
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 960px) {
+  .kpis,
+  .charts {
+    grid-template-columns: 1fr;
+  }
+}
