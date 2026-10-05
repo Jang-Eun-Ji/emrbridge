@@ -18,7 +18,7 @@ describe('Dashboard', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('조회 API가 아직 없습니다');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Read API is not available yet');
     http.verify();
   });
 });

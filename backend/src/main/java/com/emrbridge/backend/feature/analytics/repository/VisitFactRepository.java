@@ -70,12 +70,12 @@ public interface VisitFactRepository extends JpaRepository<VisitFact, Integer> {
     List<Object[]> findRegionDistribution(Pageable pageable);
 
     @Query("""
-            SELECT COALESCE(d.diseaseCategory, '기타'),
+            SELECT COALESCE(d.diseaseCategory, 'Other'),
                    COUNT(DISTINCT p.patientId), COALESCE(SUM(v.visitCount), 0)
             FROM VisitFact v
             JOIN v.disease d
             JOIN v.patient p
-            GROUP BY COALESCE(d.diseaseCategory, '기타')
+            GROUP BY COALESCE(d.diseaseCategory, 'Other')
             ORDER BY SUM(v.visitCount) DESC
             """)
     List<Object[]> findCategoryDistribution();

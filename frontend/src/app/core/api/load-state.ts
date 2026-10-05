@@ -20,10 +20,10 @@ export function load<T>(source: Observable<T>): Observable<LoadState<T>> {
 
 export function loadErrorMessage(statusCode: number | undefined, endpoint: string): string {
   if (statusCode === 0 || statusCode === 502 || statusCode === 503 || statusCode === 504) {
-    return `백엔드에 연결하지 못했습니다. Spring Boot가 8080에서 실행 중인지 확인해 주세요. (${endpoint})`;
+    return `Could not reach the backend. Make sure Spring Boot is running on port 8080. (${endpoint})`;
   }
   if (statusCode === 404) {
-    return `조회 API가 아직 없습니다. ${endpoint} 를 백엔드에 추가하면 이 화면에 데이터가 표시됩니다.`;
+    return `Read API is not available yet. Add ${endpoint} on the backend to populate this view.`;
   }
-  return `데이터를 불러오지 못했습니다. (${endpoint})`;
+  return `Failed to load data. (${endpoint})`;
 }

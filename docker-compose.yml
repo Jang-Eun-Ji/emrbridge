@@ -69,6 +69,9 @@ services:
     container_name: emrbridge-frontend
     ports:
       - "8082:80"
+    volumes:
+      - .:/app           # 내 컴퓨터의 현재 폴더(.)를 컨테이너의 /app 폴더에 동기화
+      - /app/node_modules # 컨테이너 내부의 node_modules는 덮어쓰지 않도록 보호
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

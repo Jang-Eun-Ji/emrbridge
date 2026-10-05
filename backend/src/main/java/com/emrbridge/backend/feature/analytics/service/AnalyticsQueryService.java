@@ -155,7 +155,7 @@ public class AnalyticsQueryService {
     private PipelineStageStatusDto emrStage() {
         try {
             long count = emrPatientRepository.count();
-            return stage("emr", count, null, "EMR DB emr_patient 건수입니다.");
+            return stage("emr", count, null, "Row count from EMR emr_patient.");
         } catch (Exception ex) {
             return new PipelineStageStatusDto("emr", "failed", null, null, ex.getMessage());
         }
@@ -164,7 +164,7 @@ public class AnalyticsQueryService {
     private PipelineStageStatusDto fhirStage() {
         try {
             long count = fhirExtractService.countPatients();
-            return stage("fhir", count, null, "HAPI FHIR Patient 리소스 건수입니다.");
+            return stage("fhir", count, null, "Patient resource count from HAPI FHIR.");
         } catch (Exception ex) {
             return new PipelineStageStatusDto("fhir", "failed", null, null, ex.getMessage());
         }
@@ -173,7 +173,7 @@ public class AnalyticsQueryService {
     private PipelineStageStatusDto analyticsStage() {
         try {
             long count = visitFactRepository.count();
-            return stage("analytics", count, null, "Analytics visit_facts 건수입니다.");
+            return stage("analytics", count, null, "Row count from Analytics visit_facts.");
         } catch (Exception ex) {
             return new PipelineStageStatusDto("analytics", "failed", null, null, ex.getMessage());
         }

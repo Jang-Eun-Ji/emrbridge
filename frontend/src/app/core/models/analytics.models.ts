@@ -1,4 +1,4 @@
-/** REST 계약. Spring Boot Jackson 기본값인 camelCase를 사용합니다. */
+/** REST contract. Uses Spring Boot Jackson camelCase by default. */
 
 export interface MonthlyVisitSummary {
   yearMonth: string;

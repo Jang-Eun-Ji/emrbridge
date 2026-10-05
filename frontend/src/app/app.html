@@ -7,7 +7,7 @@
         <small>Clinical analytics</small>
       </div>
     </div>
-    <nav aria-label="주요 메뉴">
+    <nav aria-label="Main navigation">
       @for (item of nav; track item.path) {
         <a [routerLink]="item.path" routerLinkActive="active">
           <mat-icon>{{ item.icon }}</mat-icon>

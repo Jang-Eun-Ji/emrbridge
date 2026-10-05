@@ -18,9 +18,9 @@ interface NavItem {
 })
 export class App {
   readonly nav: NavItem[] = [
-    { path: '/dashboard', label: 'Dashboard', caption: '의료 데이터 통계', icon: 'dashboard' },
-    { path: '/patients', label: 'Patients', caption: '환자 목록', icon: 'group' },
-    { path: '/conditions', label: 'Conditions', caption: '질병 분석', icon: 'medical_information' },
-    { path: '/pipeline', label: 'Data Pipeline', caption: '처리 상태', icon: 'account_tree' },
+    { path: '/dashboard', label: 'Dashboard', caption: 'Clinical statistics', icon: 'dashboard' },
+    { path: '/patients', label: 'Patients', caption: 'Patient list', icon: 'group' },
+    { path: '/conditions', label: 'Conditions', caption: 'Disease analysis', icon: 'medical_information' },
+    { path: '/pipeline', label: 'Data Pipeline', caption: 'Processing status', icon: 'account_tree' },
   ];
 }
