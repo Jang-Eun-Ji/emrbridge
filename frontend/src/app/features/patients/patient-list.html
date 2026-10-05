@@ -1,0 +1,66 @@
+<section class="page">
+  <header class="page-header">
+    <p class="eyebrow">Patients</p>
+    <h1>환자 목록</h1>
+    <p>Analytics의 환자 차원입니다. 행을 누르면 방문 이력을 볼 수 있습니다.</p>
+  </header>
+
+  <div class="toolbar">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>이름 또는 환자 ID</mat-label>
+      <input matInput [formControl]="query" />
+    </mat-form-field>
+    @if (totalLabel()) {
+      <span class="count">{{ totalLabel() }}</span>
+    }
+  </div>
+
+  @if (state(); as current) {
+    @if (current.status === 'loading') {
+      <mat-progress-bar mode="indeterminate" />
+    }
+    @if (current.status === 'error') {
+      <app-load-error [statusCode]="current.statusCode" endpoint="GET /api/analytics/patients" />
+    }
+  }
+
+  @if (state().status === 'ready') {
+    @if (patients().length === 0) {
+      <p class="empty">조건에 맞는 환자가 없습니다.</p>
+    } @else {
+      <table mat-table [dataSource]="patients()">
+        <ng-container matColumnDef="patientId">
+          <th mat-header-cell *matHeaderCellDef>환자 ID</th>
+          <td mat-cell *matCellDef="let row">{{ row.patientId }}</td>
+        </ng-container>
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>이름</th>
+          <td mat-cell *matCellDef="let row">{{ patientName(row) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="gender">
+          <th mat-header-cell *matHeaderCellDef>성별</th>
+          <td mat-cell *matCellDef="let row">{{ genderLabel(row.gender) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="age">
+          <th mat-header-cell *matHeaderCellDef>나이</th>
+          <td mat-cell *matCellDef="let row">{{ displayValue(row.age) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="ageGroup">
+          <th mat-header-cell *matHeaderCellDef>연령대</th>
+          <td mat-cell *matCellDef="let row">{{ displayValue(row.ageGroup) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="region">
+          <th mat-header-cell *matHeaderCellDef>지역</th>
+          <td mat-cell *matCellDef="let row">{{ displayValue(row.regionName) }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr
+          mat-row
+          *matRowDef="let row; columns: displayedColumns"
+          [routerLink]="['/patients', row.patientId]"
+        ></tr>
+      </table>
+    }
+  }
+</section>

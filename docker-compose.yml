@@ -63,6 +63,15 @@ services:
       HAPI_FHIR_ALLOW_EXTERNAL_REFERENCES: "true"
       HAPI_FHIR_REUSE_CACHED_SEARCH_RESULTS_MILLIS: "60000"
 
+  frontend:
+    build:
+      context: ./frontend
+    container_name: emrbridge-frontend
+    ports:
+      - "8082:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   emr-db-data:
   fhir-db-data:

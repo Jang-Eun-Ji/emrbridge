@@ -1,5 +1,6 @@
 package com.emrbridge.backend.feature.analytics.service;
 
+import ca.uhn.fhir.rest.api.SummaryEnum;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,15 @@ public class FhirExtractService {
 
     public List<Condition> fetchAllConditions() {
         return fetchAll(Condition.class);
+    }
+
+    public long countPatients() {
+        Bundle bundle = fhirClient.search()
+                .forResource(Patient.class)
+                .summaryMode(SummaryEnum.COUNT)
+                .returnBundle(Bundle.class)
+                .execute();
+        return Math.max(bundle.getTotal(), 0);
     }
 
     private <T extends Resource> List<T> fetchAll(Class<T> resourceType) {

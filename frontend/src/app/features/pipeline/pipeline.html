@@ -1,0 +1,48 @@
+<section class="page">
+  <header class="page-header">
+    <p class="eyebrow">Data Pipeline</p>
+    <h1>EMR → FHIR → Analytics</h1>
+    <p>원본 적재, FHIR 변환, Analytics 스타 스키마 적재 상태입니다.</p>
+  </header>
+
+  @if (state(); as current) {
+    @if (current.status === 'loading') {
+      <mat-progress-bar mode="indeterminate" />
+    }
+    @if (current.status === 'error') {
+      <app-load-error [statusCode]="current.statusCode" endpoint="GET /api/analytics/pipeline" />
+    }
+  }
+
+  <ol class="stages">
+    @for (stage of stages(); track stage.key; let last = $last) {
+      <li [attr.data-status]="stage.status">
+        <div class="icon">
+          <mat-icon>{{ stage.icon }}</mat-icon>
+        </div>
+        <div class="body">
+          <div class="title-row">
+            <h2>{{ stage.title }}</h2>
+            <span class="status">{{ statusLabel(stage.status) }}</span>
+          </div>
+          <p class="subtitle">{{ stage.subtitle }}</p>
+          <p>{{ stage.description }}</p>
+          <p class="endpoint">{{ stage.endpoint }}</p>
+          <p class="meta">
+            건수 {{ stage.recordCount == null ? '—' : (stage.recordCount | number) }}
+            · 최근 실행
+            {{ stage.lastRunAt ? (stage.lastRunAt | date: 'yyyy-MM-dd HH:mm') : '—' }}
+          </p>
+          @if (stage.message) {
+            <p class="meta">{{ stage.message }}</p>
+          }
+        </div>
+      </li>
+      @if (!last) {
+        <li class="arrow" aria-hidden="true">
+          <mat-icon>arrow_forward</mat-icon>
+        </li>
+      }
+    }
+  </ol>
+</section>
