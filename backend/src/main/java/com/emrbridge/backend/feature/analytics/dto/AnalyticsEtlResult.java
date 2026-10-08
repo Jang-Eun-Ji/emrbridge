@@ -14,6 +14,7 @@ public class AnalyticsEtlResult {
     private final int patientDimRows;
     private final int diseaseDimRows;
     private final int timeDimRows;
+    private final int hospitalDimRows;
     private final int visitFactRows;
     private final int skippedPatients;
     private final int skippedEncounters;

@@ -26,6 +26,18 @@ public class EncounterConverter {
 
         encounter.setSubject(new Reference("Patient?identifier=" + emr.getPatient().getSyntheaPatientId()));
 
+        // Link visit to the treating hospital (FHIR Organization) so Analytics ETL
+        // can populate hospital_dim / visit_facts.hospital_id.
+        if (emr.getOrganization() != null && emr.getOrganization().getSyntheaId() != null) {
+            Reference hospitalRef = new Reference(
+                    "Organization?identifier=http://emrbridge.com/organization-id|"
+                            + emr.getOrganization().getSyntheaId());
+            if (emr.getOrganization().getName() != null) {
+                hospitalRef.setDisplay(emr.getOrganization().getName());
+            }
+            encounter.setServiceProvider(hospitalRef);
+        }
+
         if (emr.getStartTime() != null) {
             Period period = new Period();
             period.setStartElement(toDateTimeType(emr.getStartTime()));

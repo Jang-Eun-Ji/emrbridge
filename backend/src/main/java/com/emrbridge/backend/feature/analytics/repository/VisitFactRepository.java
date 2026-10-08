@@ -14,7 +14,7 @@ public interface VisitFactRepository extends JpaRepository<VisitFact, Integer> {
 
     @Modifying
     @Transactional(transactionManager = "analyticsTransactionManager")
-    @Query(value = "TRUNCATE visit_facts, patient_dim, disease_dim, region_dim, time_dim RESTART IDENTITY CASCADE", nativeQuery = true)
+    @Query(value = "TRUNCATE visit_facts, patient_dim, disease_dim, region_dim, time_dim, hospital_dim RESTART IDENTITY CASCADE", nativeQuery = true)
     void truncateAll();
 
     @Query("""

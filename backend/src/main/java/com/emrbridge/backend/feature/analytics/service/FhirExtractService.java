@@ -8,6 +8,7 @@ import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Condition;
 import org.hl7.fhir.r4.model.Encounter;
+import org.hl7.fhir.r4.model.Organization;
 import org.hl7.fhir.r4.model.Patient;
 import org.hl7.fhir.r4.model.Resource;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,10 @@ public class FhirExtractService {
 
     public List<Condition> fetchAllConditions() {
         return fetchAll(Condition.class);
+    }
+
+    public List<Organization> fetchAllOrganizations() {
+        return fetchAll(Organization.class);
     }
 
     public long countPatients() {

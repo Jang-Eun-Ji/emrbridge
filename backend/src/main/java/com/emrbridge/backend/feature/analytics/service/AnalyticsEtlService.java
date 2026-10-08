@@ -23,12 +23,16 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AnalyticsEtlService {
 
+    private static final String ORG_IDENTIFIER_SYSTEM = "http://emrbridge.com/organization-id";
+    private static final String UNKNOWN_HOSPITAL_KEY = "UNKNOWN";
+
     private final FhirExtractService fhirExtractService;
     private final VisitFactRepository visitFactRepository;
     private final RegionDimRepository regionDimRepository;
     private final PatientDimRepository patientDimRepository;
     private final DiseaseDimRepository diseaseDimRepository;
     private final TimeDimRepository timeDimRepository;
+    private final HospitalDimRepository hospitalDimRepository;
 
     @Transactional(transactionManager = "analyticsTransactionManager")
     public AnalyticsEtlResult runEtl() {
@@ -37,6 +41,7 @@ public class AnalyticsEtlService {
         List<Patient> fhirPatients = fhirExtractService.fetchAllPatients();
         List<Encounter> fhirEncounters = fhirExtractService.fetchAllEncounters();
         List<Condition> fhirConditions = fhirExtractService.fetchAllConditions();
+        List<Organization> fhirOrganizations = fhirExtractService.fetchAllOrganizations();
 
         visitFactRepository.truncateAll();
 
@@ -44,6 +49,9 @@ public class AnalyticsEtlService {
         Map<Long, PatientDim> patientDimByFhirId = new HashMap<>();
         Map<String, DiseaseDim> diseaseByCode = new HashMap<>();
         Map<String, TimeDim> timeByYearMonth = new HashMap<>();
+        Map<String, HospitalDim> hospitalByOrgKey = new HashMap<>();
+
+        OrganizationIndex organizationIndex = indexOrganizations(fhirOrganizations);
 
         int skippedPatients = 0;
         int patientDimRows = 0;
@@ -121,6 +129,7 @@ public class AnalyticsEtlService {
 
             RegionDim region = patientDim.getRegion();
             TimeDim timeDim = getOrCreateTimeDim(timeByYearMonth, visitDate);
+            HospitalDim hospital = resolveHospital(hospitalByOrgKey, organizationIndex, encounter.getServiceProvider());
 
             List<DiseaseInfo> diseases = resolveDiseasesFromConditions(
                     conditionsByEncounterFhirId.get(fhirEncounterId)
@@ -143,6 +152,7 @@ public class AnalyticsEtlService {
                         .disease(diseaseDim)
                         .time(timeDim)
                         .region(region)
+                        .hospital(hospital)
                         .visitDate(visitDate)
                         .visitCount(1)
                         .visitType(visitType)
@@ -153,8 +163,8 @@ public class AnalyticsEtlService {
             }
         }
 
-        log.info("Analytics ETL 완료 - patients: {}, encounters: {}, visit_facts: {}",
-                patientDimRows, fhirEncounters.size() - skippedEncounters, visitFactRows);
+        log.info("Analytics ETL 완료 - patients: {}, encounters: {}, hospitals: {}, visit_facts: {}",
+                patientDimRows, fhirEncounters.size() - skippedEncounters, hospitalByOrgKey.size(), visitFactRows);
 
         return AnalyticsEtlResult.builder()
                 .patientsFromFhir(fhirPatients.size())
@@ -164,6 +174,7 @@ public class AnalyticsEtlService {
                 .patientDimRows(patientDimRows)
                 .diseaseDimRows(diseaseByCode.size())
                 .timeDimRows(timeByYearMonth.size())
+                .hospitalDimRows(hospitalByOrgKey.size())
                 .visitFactRows(visitFactRows)
                 .skippedPatients(skippedPatients)
                 .skippedEncounters(skippedEncounters)
@@ -234,6 +245,151 @@ public class AnalyticsEtlService {
                                 .diseaseCategory(AnalyticsMapper.resolveDiseaseCategory(code, name))
                                 .build()))
         );
+    }
+
+    private OrganizationIndex indexOrganizations(List<Organization> organizations) {
+        Map<Long, Organization> byFhirId = new HashMap<>();
+        Map<String, Organization> byOrgIdentifier = new HashMap<>();
+        for (Organization organization : organizations) {
+            Long id = fhirId(organization.getIdElement());
+            if (id != null) {
+                byFhirId.put(id, organization);
+            }
+            String orgKey = extractOrganizationIdentifier(organization);
+            if (orgKey != null) {
+                byOrgIdentifier.put(orgKey, organization);
+            }
+        }
+        return new OrganizationIndex(byFhirId, byOrgIdentifier);
+    }
+
+    private HospitalDim resolveHospital(
+            Map<String, HospitalDim> cache,
+            OrganizationIndex organizationIndex,
+            Reference serviceProvider
+    ) {
+        Organization organization = resolveOrganization(organizationIndex, serviceProvider);
+        if (organization != null) {
+            String orgKey = firstNonBlank(
+                    extractOrganizationIdentifier(organization),
+                    fhirId(organization.getIdElement()) != null
+                            ? String.valueOf(fhirId(organization.getIdElement()))
+                            : null,
+                    UNKNOWN_HOSPITAL_KEY
+            );
+            String name = firstNonBlank(organization.getName(), serviceProviderDisplay(serviceProvider), orgKey);
+            String city = organization.hasAddress() ? organization.getAddressFirstRep().getCity() : null;
+            String state = organization.hasAddress() ? organization.getAddressFirstRep().getState() : null;
+            return getOrCreateHospital(cache, orgKey, name, city, state);
+        }
+
+        String display = serviceProviderDisplay(serviceProvider);
+        if (display != null) {
+            return getOrCreateHospital(cache, "DISPLAY:" + display, display, null, null);
+        }
+
+        return getOrCreateHospital(cache, UNKNOWN_HOSPITAL_KEY, "Unknown Hospital", null, null);
+    }
+
+    private Organization resolveOrganization(OrganizationIndex index, Reference serviceProvider) {
+        if (serviceProvider == null) {
+            return null;
+        }
+
+        Long fhirOrgId = fhirIdFromReference(serviceProvider);
+        if (fhirOrgId != null) {
+            Organization byId = index.byFhirId().get(fhirOrgId);
+            if (byId != null) {
+                return byId;
+            }
+        }
+
+        String identifierValue = extractIdentifierValueFromReference(serviceProvider, ORG_IDENTIFIER_SYSTEM);
+        if (identifierValue != null) {
+            return index.byOrgIdentifier().get(identifierValue);
+        }
+
+        return null;
+    }
+
+    private HospitalDim getOrCreateHospital(
+            Map<String, HospitalDim> cache,
+            String originalOrganizationId,
+            String hospitalName,
+            String city,
+            String state
+    ) {
+        return cache.computeIfAbsent(originalOrganizationId, key ->
+                hospitalDimRepository.findByOriginalOrganizationId(originalOrganizationId)
+                        .orElseGet(() -> hospitalDimRepository.save(HospitalDim.builder()
+                                .originalOrganizationId(originalOrganizationId)
+                                .hospitalName(hospitalName != null && !hospitalName.isBlank()
+                                        ? hospitalName
+                                        : originalOrganizationId)
+                                .city(city)
+                                .state(state)
+                                .build()))
+        );
+    }
+
+    private String extractOrganizationIdentifier(Organization organization) {
+        if (organization == null || !organization.hasIdentifier()) {
+            return null;
+        }
+        for (Identifier identifier : organization.getIdentifier()) {
+            if (ORG_IDENTIFIER_SYSTEM.equals(identifier.getSystem())
+                    && identifier.getValue() != null
+                    && !identifier.getValue().isBlank()) {
+                return identifier.getValue();
+            }
+        }
+        // Fallback: first non-blank identifier value
+        for (Identifier identifier : organization.getIdentifier()) {
+            if (identifier.getValue() != null && !identifier.getValue().isBlank()) {
+                return identifier.getValue();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Parses identifier search refs such as
+     * Organization?identifier=http://emrbridge.com/organization-id|uuid
+     * or Organization?identifier=uuid
+     */
+    private String extractIdentifierValueFromReference(Reference reference, String preferredSystem) {
+        if (reference == null || reference.getReference() == null) {
+            return null;
+        }
+        String ref = reference.getReference();
+        int marker = ref.indexOf("identifier=");
+        if (marker < 0) {
+            return null;
+        }
+        String raw = ref.substring(marker + "identifier=".length());
+        int amp = raw.indexOf('&');
+        if (amp >= 0) {
+            raw = raw.substring(0, amp);
+        }
+        raw = raw.trim();
+        int pipe = raw.indexOf('|');
+        if (pipe >= 0) {
+            String system = raw.substring(0, pipe);
+            String value = raw.substring(pipe + 1);
+            if (preferredSystem == null || preferredSystem.equals(system)) {
+                return value.isBlank() ? null : value;
+            }
+            return null;
+        }
+        return raw.isBlank() ? null : raw;
+    }
+
+    private String serviceProviderDisplay(Reference serviceProvider) {
+        if (serviceProvider == null || !serviceProvider.hasDisplay()) {
+            return null;
+        }
+        String display = serviceProvider.getDisplay();
+        return display != null && !display.isBlank() ? display : null;
     }
 
     private Map<Long, List<Condition>> groupConditionsByEncounterFhirId(List<Condition> conditions) {
@@ -327,5 +483,11 @@ public class AnalyticsEtlService {
     }
 
     private record DiseaseInfo(String code, String name) {
+    }
+
+    private record OrganizationIndex(
+            Map<Long, Organization> byFhirId,
+            Map<String, Organization> byOrgIdentifier
+    ) {
     }
 }

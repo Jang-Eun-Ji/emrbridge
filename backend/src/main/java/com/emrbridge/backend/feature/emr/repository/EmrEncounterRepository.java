@@ -12,6 +12,6 @@ public interface EmrEncounterRepository extends JpaRepository<EmrEncounter, Long
     Optional<EmrEncounter> findBySyntheaId(String syntheaId);
     boolean existsBySyntheaId(String syntheaId);
 
-    @Query("SELECT e FROM EmrEncounter e JOIN FETCH e.patient")
+    @Query("SELECT e FROM EmrEncounter e JOIN FETCH e.patient LEFT JOIN FETCH e.organization")
     List<EmrEncounter> findAllWithPatient();
 }
