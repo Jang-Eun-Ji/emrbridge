@@ -10,6 +10,8 @@ This is a portfolio project that demonstrates healthcare interoperability (FHIR-
 
 ## Overview
 
+<img width="1710" height="947" alt="Screenshot 2026-10-27 at 12 06 24 PM" src="https://github.com/user-attachments/assets/ac38d8f9-db51-4a19-9149-71d24451261d" />
+
 Healthcare systems rarely share a single schema. EMR Bridge models a realistic data path in four steps:
 
 1. **Ingest** multi-table Synthea CSV files into a relational EMR database.
