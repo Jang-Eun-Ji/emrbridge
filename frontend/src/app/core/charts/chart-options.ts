@@ -22,7 +22,7 @@ export function monthlyVisitChart(rows: MonthlyVisitSummary[]): EChartsCoreOptio
     yAxis: { type: 'value', minInterval: 1 },
     series: [
       {
-        name: '방문',
+        name: 'Visits',
         type: 'line',
         smooth: true,
         showSymbol: false,
@@ -53,7 +53,7 @@ export function demographicChart(rows: DemographicSummary[]): EChartsCoreOption 
     grid: { left: 48, right: 16, top: 36, bottom: 32 },
     xAxis: { type: 'category', data: ageGroups },
     yAxis: { type: 'value', minInterval: 1 },
-    series: [seriesFor('M', '남'), seriesFor('F', '여')],
+    series: [seriesFor('M', 'Male'), seriesFor('F', 'Female')],
   };
 }
 
@@ -78,14 +78,14 @@ export function rankedBarChart(
 export function diseaseBarChart(rows: DiseaseSummary[]): EChartsCoreOption | null {
   return rankedBarChart(
     rows.map((row) => ({ label: row.diseaseName, value: row.visitCount })),
-    '방문',
+    'Visits',
   );
 }
 
 export function regionBarChart(rows: RegionSummary[]): EChartsCoreOption | null {
   return rankedBarChart(
     rows.map((row) => ({ label: row.regionName, value: row.visitCount })),
-    '방문',
+    'Visits',
   );
 }
 
@@ -99,7 +99,7 @@ export function categoryPieChart(rows: CategorySummary[]): EChartsCoreOption | n
     legend: { type: 'scroll', bottom: 0 },
     series: [
       {
-        name: '분류',
+        name: 'Category',
         type: 'pie',
         radius: ['42%', '68%'],
         center: ['50%', '44%'],

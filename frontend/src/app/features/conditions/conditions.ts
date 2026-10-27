@@ -47,7 +47,7 @@ function categoriesOf(analysis: ConditionAnalysis): CategorySummary[] {
   }
   const grouped = new Map<string, CategorySummary>();
   for (const disease of analysis.diseases) {
-    const name = disease.diseaseCategory || '기타';
+    const name = disease.diseaseCategory || 'Other';
     const current = grouped.get(name) ?? {
       diseaseCategory: name,
       patientCount: 0,

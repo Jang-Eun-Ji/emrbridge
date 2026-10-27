@@ -36,6 +36,11 @@ public class VisitFact {
     @JoinColumn(name = "region_id", nullable = false)
     private RegionDim region;
 
+    /** Hospital (FHIR Organization / EMR emr_organization) responsible for this visit. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hospital_id")
+    private HospitalDim hospital;
+
     @Column(name = "visit_date", nullable = false)
     private LocalDate visitDate;
 

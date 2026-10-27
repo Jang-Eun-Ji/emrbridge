@@ -22,35 +22,35 @@ const steps: PipelineStep[] = [
   {
     key: 'emr',
     title: 'EMR',
-    subtitle: '원본 임상 데이터',
-    description: 'Synthea CSV를 EMR DB에 적재합니다.',
+    subtitle: 'Source clinical data',
+    description: 'Load Synthea CSV files into the EMR database.',
     endpoint: 'POST /api/emr/import/import/all',
     icon: 'database',
   },
   {
     key: 'fhir',
     title: 'FHIR',
-    subtitle: '표준 리소스 변환',
-    description: 'EMR 레코드를 HAPI FHIR R4 리소스로 올립니다.',
+    subtitle: 'Standard resource conversion',
+    description: 'Upload EMR records as HAPI FHIR R4 resources.',
     endpoint: 'POST /api/fhir/upload/all',
     icon: 'sync_alt',
   },
   {
     key: 'analytics',
     title: 'Analytics',
-    subtitle: '스타 스키마 적재',
-    description: 'FHIR에서 환자, 질병, 지역, 시간 차원과 방문 fact를 만듭니다.',
+    subtitle: 'Star schema load',
+    description: 'Build patient, disease, region, and time dimensions plus visit facts from FHIR.',
     endpoint: 'POST /api/analytics/etl/run',
     icon: 'analytics',
   },
 ];
 
 const statusLabels: Record<PipelineStageState, string> = {
-  unknown: '미확인',
-  idle: '대기',
-  running: '실행 중',
-  succeeded: '완료',
-  failed: '실패',
+  unknown: 'Unknown',
+  idle: 'Idle',
+  running: 'Running',
+  succeeded: 'Succeeded',
+  failed: 'Failed',
 };
 
 @Component({

@@ -17,10 +17,10 @@ import com.emrbridge.backend.feature.analytics.dto.PatientVisitDto;
 import com.emrbridge.backend.feature.analytics.dto.PipelineStageStatusDto;
 import com.emrbridge.backend.feature.analytics.dto.PipelineStatusDto;
 import com.emrbridge.backend.feature.analytics.dto.RegionSummaryDto;
-import com.emrbridge.backend.feature.analytics.repository.DiseaseDimRepository;
 import com.emrbridge.backend.feature.analytics.repository.PatientDimRepository;
-import com.emrbridge.backend.feature.analytics.repository.RegionDimRepository;
 import com.emrbridge.backend.feature.analytics.repository.VisitFactRepository;
+import com.emrbridge.backend.feature.auth.security.AuthUserPrincipal;
+import com.emrbridge.backend.feature.auth.security.SecurityUtils;
 import com.emrbridge.backend.feature.emr.repository.EmrPatientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -39,14 +39,14 @@ public class AnalyticsQueryService {
 
     private final VisitFactRepository visitFactRepository;
     private final PatientDimRepository patientDimRepository;
-    private final DiseaseDimRepository diseaseDimRepository;
-    private final RegionDimRepository regionDimRepository;
     private final EmrPatientRepository emrPatientRepository;
     private final FhirExtractService fhirExtractService;
 
     @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public DashboardSummaryDto getDashboard() {
-        List<MonthlyVisitSummaryDto> monthlyVisits = visitFactRepository.findMonthlyVisitSummary().stream()
+        String orgId = currentOrgFilter();
+
+        List<MonthlyVisitSummaryDto> monthlyVisits = visitFactRepository.findMonthlyVisitSummary(orgId).stream()
                 .map(row -> new MonthlyVisitSummaryDto(
                         (String) row[0],
                         ((Number) row[1]).intValue(),
@@ -56,7 +56,7 @@ public class AnalyticsQueryService {
                 ))
                 .toList();
 
-        List<DemographicSummaryDto> demographics = visitFactRepository.findDemographicSummary().stream()
+        List<DemographicSummaryDto> demographics = visitFactRepository.findDemographicSummary(orgId).stream()
                 .map(row -> new DemographicSummaryDto(
                         (String) row[0],
                         (String) row[1],
@@ -66,13 +66,13 @@ public class AnalyticsQueryService {
                 .toList();
 
         List<DiseaseSummaryDto> topDiseases = visitFactRepository
-                .findDiseaseDistribution(PageRequest.of(0, DASHBOARD_RANK_LIMIT))
+                .findDiseaseDistribution(orgId, PageRequest.of(0, DASHBOARD_RANK_LIMIT))
                 .stream()
                 .map(this::toDiseaseSummary)
                 .toList();
 
         List<RegionSummaryDto> regions = visitFactRepository
-                .findRegionDistribution(PageRequest.of(0, DASHBOARD_RANK_LIMIT))
+                .findRegionDistribution(orgId, PageRequest.of(0, DASHBOARD_RANK_LIMIT))
                 .stream()
                 .map(row -> new RegionSummaryDto(
                         (String) row[0],
@@ -84,10 +84,10 @@ public class AnalyticsQueryService {
                 .toList();
 
         return new DashboardSummaryDto(
-                patientDimRepository.count(),
-                visitFactRepository.sumVisitCount(),
-                diseaseDimRepository.count(),
-                regionDimRepository.count(),
+                visitFactRepository.countDistinctPatients(orgId),
+                visitFactRepository.sumVisitCount(orgId),
+                visitFactRepository.countDistinctDiseases(orgId),
+                visitFactRepository.countDistinctRegions(orgId),
                 monthlyVisits,
                 demographics,
                 topDiseases,
@@ -97,8 +97,9 @@ public class AnalyticsQueryService {
 
     @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public PatientPageDto listPatients(String query) {
+        String orgId = currentOrgFilter();
         String q = query == null ? "" : query.trim();
-        List<PatientSummaryDto> items = patientDimRepository.search(q).stream()
+        List<PatientSummaryDto> items = patientDimRepository.search(q, orgId).stream()
                 .map(this::toPatientSummary)
                 .toList();
         return new PatientPageDto(items, items.size());
@@ -106,9 +107,16 @@ public class AnalyticsQueryService {
 
     @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public Optional<PatientDetailDto> getPatient(Integer patientId) {
+        String orgId = currentOrgFilter();
+        if (visitFactRepository.countByPatientId(patientId, orgId) == 0) {
+            return Optional.empty();
+        }
+
         return patientDimRepository.findByIdWithRegion(patientId).map(patient -> {
             RegionDim region = patient.getRegion();
-            List<PatientVisitDto> visits = visitFactRepository.findByPatientIdWithDisease(patientId).stream()
+            List<PatientVisitDto> visits = visitFactRepository
+                    .findByPatientIdWithDisease(patientId, orgId)
+                    .stream()
                     .map(this::toPatientVisit)
                     .toList();
             return new PatientDetailDto(
@@ -131,10 +139,11 @@ public class AnalyticsQueryService {
 
     @Transactional(transactionManager = "analyticsTransactionManager", readOnly = true)
     public ConditionAnalysisDto getConditions() {
-        List<DiseaseSummaryDto> diseases = visitFactRepository.findDiseaseDistribution().stream()
+        String orgId = currentOrgFilter();
+        List<DiseaseSummaryDto> diseases = visitFactRepository.findDiseaseDistribution(orgId).stream()
                 .map(this::toDiseaseSummary)
                 .toList();
-        List<CategorySummaryDto> categories = visitFactRepository.findCategoryDistribution().stream()
+        List<CategorySummaryDto> categories = visitFactRepository.findCategoryDistribution(orgId).stream()
                 .map(row -> new CategorySummaryDto(
                         (String) row[0],
                         ((Number) row[1]).longValue(),
@@ -152,10 +161,15 @@ public class AnalyticsQueryService {
         return new PipelineStatusDto(stages);
     }
 
+    private String currentOrgFilter() {
+        AuthUserPrincipal user = SecurityUtils.requireCurrentUser();
+        return user.hospitalFilterOrgId();
+    }
+
     private PipelineStageStatusDto emrStage() {
         try {
             long count = emrPatientRepository.count();
-            return stage("emr", count, null, "EMR DB emr_patient 건수입니다.");
+            return stage("emr", count, null, "Row count from EMR emr_patient.");
         } catch (Exception ex) {
             return new PipelineStageStatusDto("emr", "failed", null, null, ex.getMessage());
         }
@@ -164,7 +178,7 @@ public class AnalyticsQueryService {
     private PipelineStageStatusDto fhirStage() {
         try {
             long count = fhirExtractService.countPatients();
-            return stage("fhir", count, null, "HAPI FHIR Patient 리소스 건수입니다.");
+            return stage("fhir", count, null, "Patient resource count from HAPI FHIR.");
         } catch (Exception ex) {
             return new PipelineStageStatusDto("fhir", "failed", null, null, ex.getMessage());
         }
@@ -172,8 +186,9 @@ public class AnalyticsQueryService {
 
     private PipelineStageStatusDto analyticsStage() {
         try {
-            long count = visitFactRepository.count();
-            return stage("analytics", count, null, "Analytics visit_facts 건수입니다.");
+            // Pipeline status is unauthenticated — show overall (unscoped) counts.
+            long count = visitFactRepository.sumVisitCount(null);
+            return stage("analytics", count, null, "Visit count from Analytics visit_facts.");
         } catch (Exception ex) {
             return new PipelineStageStatusDto("analytics", "failed", null, null, ex.getMessage());
         }

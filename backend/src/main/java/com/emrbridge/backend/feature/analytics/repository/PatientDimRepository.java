@@ -15,14 +15,19 @@ public interface PatientDimRepository extends JpaRepository<PatientDim, Integer>
     @Query("""
             SELECT DISTINCT p FROM PatientDim p
             LEFT JOIN FETCH p.region
-            WHERE :q = ''
-               OR LOWER(COALESCE(p.firstName, '')) LIKE LOWER(CONCAT('%', :q, '%'))
-               OR LOWER(COALESCE(p.lastName, '')) LIKE LOWER(CONCAT('%', :q, '%'))
-               OR CAST(p.patientId AS string) LIKE CONCAT('%', :q, '%')
-               OR CAST(p.originalPatientId AS string) LIKE CONCAT('%', :q, '%')
+            LEFT JOIN VisitFact v ON v.patient = p
+            LEFT JOIN v.hospital h
+            WHERE (:orgId IS NULL OR h.originalOrganizationId = :orgId)
+              AND (
+                   :q = ''
+                   OR LOWER(COALESCE(p.firstName, '')) LIKE LOWER(CONCAT('%', :q, '%'))
+                   OR LOWER(COALESCE(p.lastName, '')) LIKE LOWER(CONCAT('%', :q, '%'))
+                   OR CAST(p.patientId AS string) LIKE CONCAT('%', :q, '%')
+                   OR CAST(p.originalPatientId AS string) LIKE CONCAT('%', :q, '%')
+              )
             ORDER BY p.patientId
             """)
-    List<PatientDim> search(@Param("q") String q);
+    List<PatientDim> search(@Param("q") String q, @Param("orgId") String orgId);
 
     @Query("""
             SELECT p FROM PatientDim p

@@ -1,8 +1,8 @@
 <section class="page">
   <header class="page-header">
     <p class="eyebrow">Dashboard</p>
-    <h1>의료 데이터 통계</h1>
-    <p>Analytics DB의 방문, 환자, 질병, 지역 집계입니다.</p>
+    <h1>Clinical statistics</h1>
+    <p>Visit, patient, disease, and region aggregates from the Analytics DB.</p>
   </header>
 
   @if (state(); as current) {
@@ -25,10 +25,10 @@
 
   @if (state().status === 'ready') {
     <div class="charts">
-      <app-chart-panel title="월별 방문" [options]="monthlyChart()" />
-      <app-chart-panel title="연령 · 성별" [options]="demographicChart()" />
-      <app-chart-panel title="방문이 많은 질병" [options]="diseaseChart()" />
-      <app-chart-panel title="지역별 방문" [options]="regionChart()" />
+      <app-chart-panel title="Monthly visits" [options]="monthlyChart()" />
+      <app-chart-panel title="Age · gender" [options]="demographicChart()" />
+      <app-chart-panel title="Top diseases by visits" [options]="diseaseChart()" />
+      <app-chart-panel title="Visits by region" [options]="regionChart()" />
     </div>
   }
 </section>

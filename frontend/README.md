@@ -15,10 +15,10 @@ Open http://localhost:4200. `/api` is proxied to http://localhost:8080.
 
 ## Screens
 
-- `/dashboard` — 의료 데이터 통계
-- `/patients` and `/patients/:id` — 환자 목록과 상세
-- `/conditions` — 질병/의료상태 분석
-- `/pipeline` — EMR → FHIR → Analytics 처리 상태
+- `/dashboard` — clinical statistics
+- `/patients` and `/patients/:id` — patient list and detail
+- `/conditions` — condition / disease analysis
+- `/pipeline` — EMR → FHIR → Analytics processing status
 
 Read endpoints the screens call:
 

@@ -1,5 +1,5 @@
 <section class="page">
-  <a class="back" routerLink="/patients">환자 목록</a>
+  <a class="back" routerLink="/patients">Back to patients</a>
 
   @if (state(); as current) {
     @if (current.status === 'loading') {
@@ -17,51 +17,51 @@
     <header class="page-header">
       <p class="eyebrow">Patients</p>
       <h1>{{ patientName(patient) }}</h1>
-      <p>분석 ID {{ patient.patientId }} · FHIR Patient {{ patient.originalPatientId }}</p>
+      <p>Analytics ID {{ patient.patientId }} · FHIR Patient {{ patient.originalPatientId }}</p>
     </header>
 
     <dl class="facts">
       <div>
-        <dt>성별</dt>
+        <dt>Gender</dt>
         <dd>{{ genderLabel(patient.gender) }}</dd>
       </div>
       <div>
-        <dt>생년월일</dt>
+        <dt>Date of birth</dt>
         <dd>{{ patient.birthDate }}</dd>
       </div>
       <div>
-        <dt>나이</dt>
+        <dt>Age</dt>
         <dd>{{ displayValue(patient.age) }}</dd>
       </div>
       <div>
-        <dt>연령대</dt>
+        <dt>Age group</dt>
         <dd>{{ displayValue(patient.ageGroup) }}</dd>
       </div>
       <div>
-        <dt>지역</dt>
+        <dt>Region</dt>
         <dd>{{ displayValue(patient.regionName) }}</dd>
       </div>
       <div>
-        <dt>등록일</dt>
+        <dt>Registered</dt>
         <dd>{{ displayValue(patient.registrationDate) }}</dd>
       </div>
     </dl>
 
-    <h2>방문 이력</h2>
+    <h2>Visit history</h2>
     @if (patient.visits.length === 0) {
-      <p class="empty">방문 기록이 없습니다.</p>
+      <p class="empty">No visits recorded.</p>
     } @else {
       <table mat-table [dataSource]="patient.visits">
         <ng-container matColumnDef="visitDate">
-          <th mat-header-cell *matHeaderCellDef>방문일</th>
+          <th mat-header-cell *matHeaderCellDef>Visit date</th>
           <td mat-cell *matCellDef="let row">{{ row.visitDate }}</td>
         </ng-container>
         <ng-container matColumnDef="visitType">
-          <th mat-header-cell *matHeaderCellDef>유형</th>
+          <th mat-header-cell *matHeaderCellDef>Type</th>
           <td mat-cell *matCellDef="let row">{{ displayValue(row.visitType) }}</td>
         </ng-container>
         <ng-container matColumnDef="disease">
-          <th mat-header-cell *matHeaderCellDef>질병</th>
+          <th mat-header-cell *matHeaderCellDef>Condition</th>
           <td mat-cell *matCellDef="let row">
             {{ row.diseaseName }}
             @if (row.diseaseCode) {
@@ -70,7 +70,7 @@
           </td>
         </ng-container>
         <ng-container matColumnDef="category">
-          <th mat-header-cell *matHeaderCellDef>분류</th>
+          <th mat-header-cell *matHeaderCellDef>Category</th>
           <td mat-cell *matCellDef="let row">{{ displayValue(row.diseaseCategory) }}</td>
         </ng-container>
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>

@@ -52,6 +52,6 @@ export class PatientList {
 
   readonly totalLabel = computed(() => {
     const state = this.state();
-    return state.status === 'ready' ? `${state.data.total.toLocaleString('ko-KR')}명` : '';
+    return state.status === 'ready' ? `${state.data.total.toLocaleString('en-US')} patients` : '';
   });
 }

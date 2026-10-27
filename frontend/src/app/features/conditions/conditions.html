@@ -1,8 +1,8 @@
 <section class="page">
   <header class="page-header">
     <p class="eyebrow">Conditions</p>
-    <h1>질병/의료상태 분석</h1>
-    <p>질병 차원과 방문 fact를 분류, 코드, 환자 수, 방문 수로 봅니다.</p>
+    <h1>Condition analysis</h1>
+    <p>Disease dimension and visit facts by category, code, patients, and visits.</p>
   </header>
 
   @if (state(); as current) {
@@ -15,30 +15,30 @@
   }
 
   @if (state().status === 'ready') {
-    <app-chart-panel title="분류별 방문" [options]="categoryChart()" />
+    <app-chart-panel title="Visits by category" [options]="categoryChart()" />
 
     @if (diseases().length === 0) {
-      <p class="empty">질병 데이터가 없습니다.</p>
+      <p class="empty">No condition data.</p>
     } @else {
       <table mat-table [dataSource]="diseases()">
         <ng-container matColumnDef="code">
-          <th mat-header-cell *matHeaderCellDef>코드</th>
+          <th mat-header-cell *matHeaderCellDef>Code</th>
           <td mat-cell *matCellDef="let row">{{ displayValue(row.diseaseCode) }}</td>
         </ng-container>
         <ng-container matColumnDef="name">
-          <th mat-header-cell *matHeaderCellDef>질병</th>
+          <th mat-header-cell *matHeaderCellDef>Condition</th>
           <td mat-cell *matCellDef="let row">{{ row.diseaseName }}</td>
         </ng-container>
         <ng-container matColumnDef="category">
-          <th mat-header-cell *matHeaderCellDef>분류</th>
+          <th mat-header-cell *matHeaderCellDef>Category</th>
           <td mat-cell *matCellDef="let row">{{ displayValue(row.diseaseCategory) }}</td>
         </ng-container>
         <ng-container matColumnDef="patients">
-          <th mat-header-cell *matHeaderCellDef>환자 수</th>
+          <th mat-header-cell *matHeaderCellDef>Patients</th>
           <td mat-cell *matCellDef="let row">{{ row.patientCount | number }}</td>
         </ng-container>
         <ng-container matColumnDef="visits">
-          <th mat-header-cell *matHeaderCellDef>방문 수</th>
+          <th mat-header-cell *matHeaderCellDef>Visits</th>
           <td mat-cell *matCellDef="let row">{{ row.visitCount | number }}</td>
         </ng-container>
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>

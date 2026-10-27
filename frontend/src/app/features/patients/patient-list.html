@@ -1,13 +1,13 @@
 <section class="page">
   <header class="page-header">
     <p class="eyebrow">Patients</p>
-    <h1>환자 목록</h1>
-    <p>Analytics의 환자 차원입니다. 행을 누르면 방문 이력을 볼 수 있습니다.</p>
+    <h1>Patient list</h1>
+    <p>Patient dimension from Analytics. Select a row to view visit history.</p>
   </header>
 
   <div class="toolbar">
     <mat-form-field appearance="outline" subscriptSizing="dynamic">
-      <mat-label>이름 또는 환자 ID</mat-label>
+      <mat-label>Name or patient ID</mat-label>
       <input matInput [formControl]="query" />
     </mat-form-field>
     @if (totalLabel()) {
@@ -26,31 +26,31 @@
 
   @if (state().status === 'ready') {
     @if (patients().length === 0) {
-      <p class="empty">조건에 맞는 환자가 없습니다.</p>
+      <p class="empty">No patients match this search.</p>
     } @else {
       <table mat-table [dataSource]="patients()">
         <ng-container matColumnDef="patientId">
-          <th mat-header-cell *matHeaderCellDef>환자 ID</th>
+          <th mat-header-cell *matHeaderCellDef>Patient ID</th>
           <td mat-cell *matCellDef="let row">{{ row.patientId }}</td>
         </ng-container>
         <ng-container matColumnDef="name">
-          <th mat-header-cell *matHeaderCellDef>이름</th>
+          <th mat-header-cell *matHeaderCellDef>Name</th>
           <td mat-cell *matCellDef="let row">{{ patientName(row) }}</td>
         </ng-container>
         <ng-container matColumnDef="gender">
-          <th mat-header-cell *matHeaderCellDef>성별</th>
+          <th mat-header-cell *matHeaderCellDef>Gender</th>
           <td mat-cell *matCellDef="let row">{{ genderLabel(row.gender) }}</td>
         </ng-container>
         <ng-container matColumnDef="age">
-          <th mat-header-cell *matHeaderCellDef>나이</th>
+          <th mat-header-cell *matHeaderCellDef>Age</th>
           <td mat-cell *matCellDef="let row">{{ displayValue(row.age) }}</td>
         </ng-container>
         <ng-container matColumnDef="ageGroup">
-          <th mat-header-cell *matHeaderCellDef>연령대</th>
+          <th mat-header-cell *matHeaderCellDef>Age group</th>
           <td mat-cell *matCellDef="let row">{{ displayValue(row.ageGroup) }}</td>
         </ng-container>
         <ng-container matColumnDef="region">
-          <th mat-header-cell *matHeaderCellDef>지역</th>
+          <th mat-header-cell *matHeaderCellDef>Region</th>
           <td mat-cell *matCellDef="let row">{{ displayValue(row.regionName) }}</td>
         </ng-container>
 

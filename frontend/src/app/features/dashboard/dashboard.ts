@@ -32,12 +32,12 @@ export class Dashboard {
     const state = this.state();
     const data = state.status === 'ready' ? state.data : null;
     const value = (count: number | undefined) =>
-      count == null ? '—' : count.toLocaleString('ko-KR');
+      count == null ? '—' : count.toLocaleString('en-US');
     return [
-      { label: '환자', value: value(data?.totalPatients) },
-      { label: '방문', value: value(data?.totalVisits) },
-      { label: '질병', value: value(data?.totalDiseases) },
-      { label: '지역', value: value(data?.totalRegions) },
+      { label: 'Patients', value: value(data?.totalPatients) },
+      { label: 'Visits', value: value(data?.totalVisits) },
+      { label: 'Diseases', value: value(data?.totalDiseases) },
+      { label: 'Regions', value: value(data?.totalRegions) },
     ];
   });
 

@@ -1,25 +1,40 @@
-<mat-sidenav-container class="shell">
-  <mat-sidenav mode="side" opened class="sidenav">
-    <div class="brand">
-      <span class="mark">EB</span>
-      <div>
-        <strong>EMR Bridge</strong>
-        <small>Clinical analytics</small>
+@if (showShell()) {
+  <mat-sidenav-container class="shell">
+    <mat-sidenav mode="side" opened class="sidenav">
+      <div class="brand">
+        <span class="mark">EB</span>
+        <div>
+          <strong>EMR Bridge</strong>
+          <small>Clinical analytics</small>
+        </div>
       </div>
-    </div>
-    <nav aria-label="주요 메뉴">
-      @for (item of nav; track item.path) {
-        <a [routerLink]="item.path" routerLinkActive="active">
-          <mat-icon>{{ item.icon }}</mat-icon>
-          <span>
-            <strong>{{ item.label }}</strong>
-            <small>{{ item.caption }}</small>
-          </span>
-        </a>
-      }
-    </nav>
-  </mat-sidenav>
-  <mat-sidenav-content>
-    <router-outlet />
-  </mat-sidenav-content>
-</mat-sidenav-container>
+      <nav aria-label="Main navigation">
+        @for (item of nav; track item.path) {
+          <a [routerLink]="item.path" routerLinkActive="active">
+            <mat-icon>{{ item.icon }}</mat-icon>
+            <span>
+              <strong>{{ item.label }}</strong>
+              <small>{{ item.caption }}</small>
+            </span>
+          </a>
+        }
+      </nav>
+
+      <div class="account">
+        <div class="account-meta">
+          <strong>{{ user()?.username || 'Signed in' }}</strong>
+          <small>{{ scopeLabel() || 'Session active' }}</small>
+        </div>
+        <button class="sign-out" type="button" (click)="logout()">
+          <mat-icon>logout</mat-icon>
+          Sign out
+        </button>
+      </div>
+    </mat-sidenav>
+    <mat-sidenav-content>
+      <router-outlet />
+    </mat-sidenav-content>
+  </mat-sidenav-container>
+} @else {
+  <router-outlet />
+}

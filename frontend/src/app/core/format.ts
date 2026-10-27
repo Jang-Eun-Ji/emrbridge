@@ -1,11 +1,11 @@
 export function genderLabel(gender: string | null): string {
   if (gender === 'M') {
-    return '남';
+    return 'Male';
   }
   if (gender === 'F') {
-    return '여';
+    return 'Female';
   }
-  return '미상';
+  return 'Unknown';
 }
 
 export function patientName(patient: {
@@ -13,7 +13,7 @@ export function patientName(patient: {
   lastName: string | null;
 }): string {
   const name = [patient.firstName, patient.lastName].filter(Boolean).join(' ');
-  return name || '이름 없음';
+  return name || 'Unnamed patient';
 }
 
 export function displayValue(value: string | number | null | undefined): string {
