@@ -49,3 +49,9 @@ csv:
 fhir:
   server:
     url: http://localhost:8081/fhir
+
+app:
+  jwt:
+    # HS256 secret (min 32 chars). Override in production via env APP_JWT_SECRET.
+    secret: ${APP_JWT_SECRET:emrbridge-dev-jwt-secret-change-me-32chars}
+    expiration-ms: ${APP_JWT_EXPIRATION_MS:86400000} # 24h
