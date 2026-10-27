@@ -1,0 +1,34 @@
+<section class="login-page">
+  <form class="card" [formGroup]="form" (ngSubmit)="submit()">
+    <div class="brand">
+      <span class="mark">EB</span>
+      <div>
+        <strong>EMR Bridge</strong>
+        <small>Sign in to clinical analytics</small>
+      </div>
+    </div>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Username</mat-label>
+      <input matInput formControlName="username" autocomplete="username" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Password</mat-label>
+      <input matInput type="password" formControlName="password" autocomplete="current-password" />
+    </mat-form-field>
+
+    @if (error(); as message) {
+      <p class="error" role="alert">{{ message }}</p>
+    }
+
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      {{ submitting() ? 'Signing in…' : 'Sign in' }}
+    </button>
+
+    <p class="hint">
+      Admin: <code>admin</code> / <code>admin123</code><br />
+      Hospital: org slug username / <code>hospital123</code>
+    </p>
+  </form>
+</section>
